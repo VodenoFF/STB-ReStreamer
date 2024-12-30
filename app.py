@@ -81,8 +81,6 @@ defaultPortal = {
     "custom channel numbers": {},
     "custom genres": {},
     "custom epg ids": {},
-    "fallback channels": {},
-    "channel groups": {},
 }
 
 def save_json(file_path, data, message):
@@ -355,7 +353,7 @@ def editor_data():
             customGenres = portals[portal].get("custom genres", {})
             customChannelNumbers = portals[portal].get("custom channel numbers", {})
             customEpgIds = portals[portal].get("custom epg ids", {})
-            fallbackChannels = portals[portal].get("fallback channels", {})
+
 
             for mac in macs:
                 try:
@@ -381,7 +379,6 @@ def editor_data():
                     customChannelName = customChannelNames.get(channelId, "")
                     customGenre = customGenres.get(channelId, "")
                     customEpgId = customEpgIds.get(channelId, "")
-                    fallbackChannel = fallbackChannels.get(channelId, "")
 
                     # Determine the group for this channel
                     group = ""
@@ -405,7 +402,6 @@ def editor_data():
                         "customGenre": customGenre,
                         "channelId": channelId,
                         "customEpgId": customEpgId,
-                        "fallbackChannel": fallbackChannel,
                         "group": group,
                         "link": f"http://{host}/play/{portal}/{channelId}?web=true",
                     })
@@ -423,7 +419,6 @@ def editorSave():
     nameEdits = json.loads(request.form["nameEdits"])
     genreEdits = json.loads(request.form["genreEdits"])
     epgEdits = json.loads(request.form["epgEdits"])
-    fallbackEdits = json.loads(request.form["fallbackEdits"])
     groupEdits = json.loads(request.form["groupEdits"])
     portals = getPortals()
     channel_groups = getChannelGroups()
@@ -460,8 +455,6 @@ def editorSave():
     for edit in epgEdits:
         update_portal(edit, "custom epg id", "custom epg ids")
 
-    for edit in fallbackEdits:
-        update_portal(edit, "channel name", "fallback channels")
 
     for edit in groupEdits:
         portal = edit["portal"]
@@ -503,8 +496,6 @@ def editorReset():
             "custom channel names": {},
             "custom genres": {},
             "custom epg ids": {},
-            "fallback channels": {},
-            "channel groups": {},
         })
 
     savePortals(portals)

@@ -16,7 +16,6 @@
                 <th>Genre</th>
                 <th>Number</th>
                 <th>EPG ID</th>
-                <th>Fallback For</th>
                 <th>Group</th>
                 <th>Portal</th>
             </tr>
@@ -31,7 +30,7 @@
         <input type="text" id="nameEdits" name="nameEdits" value="">
         <input type="text" id="genreEdits" name="genreEdits" value="">
         <input type="text" id="epgEdits" name="epgEdits" value="">
-        <input type="text" id="fallbackEdits" name="fallbackEdits" value="">
+
         <input type="text" id="groupEdits" name="groupEdits" value="">
     </form>
 
@@ -63,7 +62,7 @@
     var nameEdits = [];
     var genreEdits = [];
     var epgEdits = [];
-    var fallbackEdits = [];
+
     var groupEdits = [];
 
     function editAll(ele) {
@@ -117,13 +116,6 @@
         epgEdits.push(j);
     }
 
-    function editFallback(ele) {
-        var p = ele.getAttribute('data-portal');
-        var i = ele.getAttribute('data-channelId');
-        var c = ele.value;
-        var j = { "portal": p, "channel id": i, "channel name": c };
-        fallbackEdits.push(j);
-    }
 
     function getGroupOptions(selectedGroup) {
         let options = '<option value="">No Group</option>';
@@ -164,7 +156,7 @@
         document.getElementById("nameEdits").value = JSON.stringify(nameEdits);
         document.getElementById("genreEdits").value = JSON.stringify(genreEdits);
         document.getElementById("epgEdits").value = JSON.stringify(epgEdits);
-        document.getElementById("fallbackEdits").value = JSON.stringify(fallbackEdits);
+
         document.getElementById("groupEdits").value = JSON.stringify(groupEdits);
         document.getElementById("save edits").submit();
     }
@@ -228,8 +220,8 @@
                 { targets: 5, className: "align-middle", orderDataType: "dom-text-numeric" },
                 { targets: 6, className: "align-middle", orderDataType: "dom-text", type: 'string' },
                 { targets: 7, className: "align-middle", orderDataType: "dom-text", type: 'string' },
-                { targets: 8, className: "align-middle" },
-                { targets: 9, className: "align-middle" }
+                { targets: 8, className: "align-middle" }
+
             ],
             language: {
                 search: "",
@@ -377,20 +369,7 @@
                             '">'
                     },
                 },
-                {
-                    data: "fallbackChannel",
-                    render: function (data, type, row, meta) {
-                        return '<input \
-                                type="text" \
-                                class="form-control" \
-                                style="min-width: 200px;" \
-                                onchange="editFallback(this)" \
-                                data-portal="' + row.portal + '" \
-                                data-channelId="' + row.channelId + '" \
-                                value="' + row.fallbackChannel +
-                            '">'
-                    }
-                },
+                
                 {
                     data: "channelId",
                     render: function (data, type, row, meta) {

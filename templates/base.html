@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html data-bs-theme="dark">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -8,17 +8,67 @@
     <link rel="shortcut icon" type="image/png" href="../static/tv.png" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" type="text/css"
-        href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.0.1/css/bootstrap.min.css" />
+        href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" />
     <link rel="stylesheet" type="text/css"
         href="https://cdn.datatables.net/v/bs5/jq-3.6.0/dt-1.11.3/b-2.0.1/datatables.min.css" />
     <script type="text/javascript"
-        src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.0.1/js/bootstrap.bundle.min.js"></script>
+        src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script type="text/javascript"
         src="https://cdn.datatables.net/v/bs5/jq-3.6.0/dt-1.11.3/b-2.0.1/datatables.min.js"></script>
+    <style>
+        body {
+            background-color: #212529;
+            color: #e9ecef;
+        }
+        .navbar {
+            background-color: #343a40 !important;
+        }
+        .navbar-light .navbar-brand,
+        .navbar-light .nav-link {
+            color: #e9ecef !important;
+        }
+        .navbar-light .navbar-toggler-icon {
+            filter: invert(1);
+        }
+        .card {
+            background-color: #343a40;
+            border-color: #495057;
+        }
+        .modal-content {
+            background-color: #343a40;
+            color: #e9ecef;
+        }
+        .form-control, .form-select {
+            background-color: #495057;
+            border-color: #6c757d;
+            color: #e9ecef;
+        }
+        .form-control:focus, .form-select:focus {
+            background-color: #495057;
+            border-color: #0d6efd;
+            color: #e9ecef;
+        }
+        .table {
+            color: #e9ecef;
+        }
+        .dataTables_wrapper .dataTables_length, 
+        .dataTables_wrapper .dataTables_filter,
+        .dataTables_wrapper .dataTables_info {
+            color: #e9ecef !important;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button {
+            color: #e9ecef !important;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+            background: #0d6efd !important;
+            border-color: #0d6efd !important;
+            color: #fff !important;
+        }
+    </style>
 </head>
 
-<body class="bg-dark">
-    <nav class="navbar navbar-expand-lg navbar-light bg-light mb-3 mb-lg-3 mt-lg-5 mx-lg-5">
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light mb-3 mb-lg-3 mt-lg-5 mx-lg-5">
         <div class="container-fluid">
             <a class="navbar-brand" target="_blank" href="https://github.com/Chris230291/STB-Proxy">
                 <img src="../static/tv.png" alt="" width="24" class="d-inline-block align-text-top">
