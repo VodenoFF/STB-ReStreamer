@@ -33,10 +33,9 @@
                     <table class="table table-sm mt-2">
                         {% for key, value in portals[portal].macs.items() %}
                         <tr>
-                            <td><span>{{key.upper()}}</span></td>
+                            <td><span class="mac-address">{{key.upper()}}</span></td>
                             <td><span>:</span></td>
-                            <td><span name="expiryString">{{value}}</span></td>
-
+                            <td><span class="expiry-date" name="expiryString">{{value}}</span></td>
                         </tr>
                         {% endfor %}
                     </table>

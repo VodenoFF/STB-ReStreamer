@@ -84,6 +84,33 @@ defaultPortal = {
     "custom epg ids": {},
 }
 
+# Add alerts storage
+alerts_file = os.path.join(basePath, "alerts.json")
+
+def load_alerts():
+    try:
+        with open(alerts_file) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []
+
+def save_alerts(alerts):
+    with open(alerts_file, "w") as f:
+        json.dump(alerts, f, indent=4)
+
+def add_alert(alert_type, source, message, status="active"):
+    alerts = load_alerts()
+    alert = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "type": alert_type,
+        "source": source,
+        "message": message,
+        "status": status
+    }
+    alerts.append(alert)
+    save_alerts(alerts)
+    return alert
+
 def save_json(file_path, data, message):
     with open(file_path, "w") as f:
         json.dump(data, f, indent=4)
@@ -197,11 +224,15 @@ def authorise(f):
     return decorated
 
 def moveMac(portalId, mac):
-    portals = getPortals()
-    macs = portals[portalId]["macs"]
-    macs[mac] = macs.pop(mac)
-    portals[portalId]["macs"] = macs
-    savePortals(portals)
+    try:
+        portals = getPortals()
+        macs = portals[portalId]["macs"]
+        macs[mac] = macs.pop(mac)
+        portals[portalId]["macs"] = macs
+        savePortals(portals)
+    except Exception as e:
+        add_alert("error", f"Portal {portalId}", f"Error moving MAC {mac}: {str(e)}")
+        raise
 
 @app.route("/", methods=["GET"])
 @authorise
@@ -242,11 +273,14 @@ def portalsAdd():
             timestamp = int(time.time())
             signature = stb.generate_signature(mac, token, [str(timestamp)])
             profile = stb.getProfile(url, mac, token, device_id, device_id2, signature, timestamp, proxy)
+            print(profile)
             if 'block_msg' in profile and profile['block_msg']:
                 logger.info(profile['block_msg'])
             expiry = stb.getExpires(url, mac, token, proxy)
             if 'expire_billing_date' in profile and profile['expire_billing_date'] and not expiry:
                 expiry = profile['expire_billing_date']
+            if 'created' in profile and profile['created'] and not expiry:
+                expiry = "Never"
             if expiry:
                 macsd[mac] = expiry
                 ids[mac] = {
@@ -623,6 +657,35 @@ def playlist():
 
     return Response(playlist, mimetype="text/plain")
 
+@app.route("/groups_playlist", methods=["GET"])
+@authorise
+def groups_playlist():
+    channel_groups = getChannelGroups()
+    
+    # Sort groups by their order
+    sorted_groups = sorted(channel_groups.items(), key=lambda x: x[1].get("order", 0))
+    
+    playlist_entries = []
+    for group_name, group_data in sorted_groups:
+        # Get the group's logo URL, if it exists
+        logo_url = group_data.get("logo", "")
+        if logo_url:
+            # Make the logo URL absolute by adding the host
+            logo_url = f"http://{host}{logo_url}"
+            
+        # Create the EXTINF line for the group
+        playlist_entries.append(
+            f'#EXTINF:-1 tvg-id="{group_name}" tvg-logo="{logo_url}",{group_name}\n'
+            f'http://{host}/chplay/{group_name}'
+        )
+    
+    playlist = "#EXTM3U\n" + "\n".join(playlist_entries)
+    return Response(playlist, mimetype="text/plain")
+
+# Add channel cooldown tracking
+channel_cooldowns = {}
+COOLDOWN_DURATION = 30  # seconds
+
 @app.route("/play/<portalId>/<channelId>", methods=["GET"])
 def channel(portalId, channelId):
     def streamData():
@@ -655,41 +718,70 @@ def channel(portalId, channelId):
                 ffmpegcmd,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,  # Capture stderr for debugging
             ) as ffmpeg_sp:
                 while True:
                     chunk = ffmpeg_sp.stdout.read(1024)
-                    if len(chunk) == 0:
+                    if not chunk:
                         if ffmpeg_sp.poll() != 0:
-                            logger.info(f"Ffmpeg closed with error({ffmpeg_sp.poll()}). Moving MAC({mac}) for Portal({portalName})")
+                            stderr_output = ffmpeg_sp.stderr.read().decode('utf-8')
+                            print(f"Ffmpeg error output: {stderr_output}")
+                            print(f"Ffmpeg closed with error({ffmpeg_sp.poll()}). Moving MAC({mac}) for Portal({portalName})")
+                            add_alert("error", f"Portal: {portalName}", f"Stream failed for channel {channelName} (ID: {channelId}). Moving MAC {mac}.")
                             moveMac(portalId, mac)
                         break
                     yield chunk
-        except:
-            pass
+        except Exception as e:
+            print(f"Exception during streaming: {e}")
+            add_alert("error", f"Portal: {portalName}", f"Stream error for channel {channelName} (ID: {channelId})")
         finally:
             unoccupy()
-            ffmpeg_sp.kill()
+            if 'ffmpeg_sp' in locals():
+                ffmpeg_sp.kill()
 
     def testStream():
-        timeout = int(getSettings()["ffmpeg timeout"]) * 1000000
-        ffprobecmd = ["ffprobe", "-timeout", str(timeout), "-i", link]
+        timeout = int(getSettings().get("ffmpeg timeout")) * 1000000
+        ffprobecmd = [
+            "ffprobe",
+            "-v", "info",  # Show more info for debugging
+            "-select_streams", "v:0",  # Select the first video stream
+            "-show_entries", "stream=codec_name",  # Show codec name
+            "-of", "default=noprint_wrappers=1:nokey=1",  # Output format
+            "-timeout", str(timeout),
+            "-i", link
+        ]
 
         if proxy:
-            ffprobecmd.insert(1, "-http_proxy")
-            ffprobecmd.insert(2, proxy)
+            ffprobecmd.extend(["-http_proxy", proxy])
 
-        with subprocess.Popen(
-            ffprobecmd,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        ) as ffprobe_sb:
-            ffprobe_sb.communicate()
-            return ffprobe_sb.returncode == 0
+        try:
+            with subprocess.Popen(
+                ffprobecmd,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            ) as ffprobe_sb:
+                stdout, stderr = ffprobe_sb.communicate()
+                result = ffprobe_sb.returncode == 0 and stdout.strip() != b''
+                if not result:
+                    add_alert("error", f"Portal: {portalName}", f"Stream test failed for channel {channelName} (ID: {channelId})")
+                return result
+        except Exception as e:
+            logger.error(f"Exception during stream test: {e}")
+            add_alert("error", f"Portal: {portalName}", f"Stream test encountered an error for channel {channelName} (ID: {channelId})")
+            return False
 
     def isMacFree():
         return sum(1 for i in occupied.get(portalId, []) if i["mac"] == mac) < streamsPerMac
+
+    def check_cooldown():
+        cooldown_key = f"{portalId}:{channelId}"
+        if cooldown_key in channel_cooldowns:
+            last_access = channel_cooldowns[cooldown_key]
+            time_elapsed = time.time() - last_access
+            if time_elapsed < COOLDOWN_DURATION:
+                return False, COOLDOWN_DURATION - time_elapsed
+        return True, 0
 
     portal = getPortals().get(portalId)
     portalName = portal.get("name")
@@ -700,7 +792,64 @@ def channel(portalId, channelId):
     web = request.args.get("web")
     ip = request.remote_addr
 
+    # Initialize channelName at the start
+    channelName = None
+    try:
+        name_path = os.path.join(parent_folder, f"{portalName}.json")
+        with open(name_path, 'r') as file:
+            channels = json.load(file)
+            for c in channels:
+                if str(c["id"]) == channelId:
+                    channelName = portal.get("custom channel names", {}).get(channelId, c["name"])
+                    break
+    except:
+        pass
+    
+    # If we still don't have a channel name, use a default
+    if not channelName:
+        channelName = f"Channel ID: {channelId}"
+
     logger.info(f"IP({ip}) requested Portal({portalId}):Channel({channelId})")
+
+    # Check cooldown
+    can_access, remaining_time = check_cooldown()
+    if not can_access and not web:  # Don't apply cooldown for web preview
+        logger.info(f"Channel {channelName} ({channelId}) in cooldown. {remaining_time:.1f} seconds remaining")
+        add_alert("warning", f"Portal: {portalName}", f"Channel {channelName} in cooldown. {remaining_time:.1f} seconds remaining. Attempting fallback.")
+        
+        # Try to find a fallback in the same group
+        channel_groups = getChannelGroups()
+        current_group = None
+        
+        # Find which group this channel belongs to
+        for group_name, group_data in channel_groups.items():
+            if "channels" in group_data:
+                for ch in group_data["channels"]:
+                    if isinstance(ch, dict) and ch.get('channelId') == channelId and ch.get('portalId') == portalId:
+                        current_group = group_name
+                        break
+            if current_group:
+                break
+
+        if current_group:
+            # Try other channels in the same group
+            for channel_entry in channel_groups[current_group]["channels"]:
+                if not isinstance(channel_entry, dict):
+                    continue
+                    
+                fallback_channel_id = channel_entry['channelId']
+                fallback_portal_id = channel_entry['portalId']
+                
+                # Skip if it's the same channel or if the fallback is also in cooldown
+                fallback_key = f"{fallback_portal_id}:{fallback_channel_id}"
+                if (fallback_channel_id == channelId and fallback_portal_id == portalId) or \
+                   (fallback_key in channel_cooldowns and time.time() - channel_cooldowns[fallback_key] < COOLDOWN_DURATION):
+                    continue
+
+                return redirect(f"/play/{fallback_portal_id}/{fallback_channel_id}")
+
+        # If no fallback found, return error
+        return make_response(f"Channel in cooldown. Please wait {remaining_time:.1f} seconds.", 429)
 
     freeMac = False
 
@@ -734,6 +883,9 @@ def channel(portalId, channelId):
 
         if link:
             if getSettings().get("test streams", "true") == "false" or testStream():
+                # Update cooldown timestamp
+                channel_cooldowns[f"{portalId}:{channelId}"] = time.time()
+                
                 if web:
                     ffmpegcmd = [
                         "ffmpeg",
@@ -778,6 +930,7 @@ def channel(portalId, channelId):
 
     if not web:
         logger.info(f"Portal({portalId}):Channel({channelId}) is not working. Looking for fallbacks...")
+        add_alert("error", f"Portal: {portalName}", f"Channel {channelName} (ID: {channelId}) is not working, searching for fallbacks...")
 
         portals = getPortals()
         channelGroups = getChannelGroups()
@@ -803,6 +956,11 @@ def channel(portalId, channelId):
                 fallbackChannelId = channel_entry['channelId']
                 fallbackPortalId = channel_entry['portalId']
                 
+                # Skip if the fallback channel is in cooldown
+                fallback_key = f"{fallbackPortalId}:{fallbackChannelId}"
+                if fallback_key in channel_cooldowns and time.time() - channel_cooldowns[fallback_key] < COOLDOWN_DURATION:
+                    continue
+                
                 if fallbackChannelId != channelId:  # Don't try the same channel
                     if fallbackPortalId in portals and portals[fallbackPortalId]["enabled"] == "true":
                         url = portals[fallbackPortalId].get("url")
@@ -822,6 +980,7 @@ def channel(portalId, channelId):
                                         channels = json.load(file)
                                 except:
                                     logger.info(f"Unable to connect to fallback Portal({fallbackPortalId}) using MAC({mac})")
+                                    add_alert("warning", f"Portal: {portals[fallbackPortalId]['name']}", f"Failed to connect to fallback portal using MAC {mac}")
                                 if channels:
                                     for c in channels:
                                         if str(c["id"]) == fallbackChannelId:
@@ -836,7 +995,11 @@ def channel(portalId, channelId):
                                         else:
                                             link = cmd.split(" ")[1]
                                         if link and testStream():
+                                            # Update cooldown timestamp for the fallback channel
+                                            channel_cooldowns[fallback_key] = time.time()
+                                            
                                             logger.info(f"Fallback found in group {channelGroup} - using channel {fallbackChannelId} from Portal({fallbackPortalId})")
+                                            add_alert("warning", f"Portal: {portals[fallbackPortalId]['name']}", f"Using fallback channel {channelName} (ID: {fallbackChannelId}) from group {channelGroup}")
                                             if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
                                                 ffmpegcmd = str(getSettings()["ffmpeg command"])
                                                 ffmpegcmd = ffmpegcmd.replace("<url>", link)
@@ -853,8 +1016,10 @@ def channel(portalId, channelId):
 
     if freeMac:
         logger.info(f"No working streams found for Portal({portalId}):Channel({channelId})")
+        add_alert("error", f"Portal: {portalName}", f"No working streams found for channel {channelName} (ID: {channelId})")
     else:
         logger.info(f"No free MAC for Portal({portalId}):Channel({channelId})")
+        add_alert("error", f"Portal: {portalName}", f"No free MAC available for channel {channelName} (ID: {channelId})")
 
     return make_response("No streams available", 503)
 
@@ -938,11 +1103,6 @@ def lineup():
 
                 for mac in macs:
                     try:
-                        # token = stb.getToken(url, mac, proxy)
-                        # ids = portals[portal]["ids"][mac]
-                        # stb.getProfile(url, mac, token, ids["device_id"], ids["device_id2"], ids["signature"], ids["timestamp"], proxy)
-                        # stb.getProfile(url, mac, token, proxy)
-                        # allChannels = stb.getAllChannels(url, mac, token, proxy)
                         name_path = os.path.join(parent_folder, name + ".json")
                         genre_path = os.path.join(parent_folder, name +"_genre"+ ".json")
                         with open(name_path, 'r') as file:
@@ -1247,6 +1407,57 @@ def chplay(groupID):
                 return redirect(f"/play/{portal_id}/{channel_id}")
     
     return make_response(f"No valid channels found in group '{group_name}'", 404)
+
+@app.route("/alerts", methods=["GET"])
+@authorise
+def alerts():
+    return render_template("alerts.html", alerts=load_alerts())
+
+@app.route("/alerts/unresolved/count", methods=["GET"])
+@authorise
+def unresolved_alerts_count():
+    alerts = load_alerts()
+    count = sum(1 for alert in alerts if alert.get('status') == 'active')
+    return jsonify({"count": count})
+
+@app.route("/resolve_alert", methods=["POST"])
+@authorise
+def resolve_alert():
+    try:
+        data = request.get_json()
+        alert_id = data.get('alert_id')
+        
+        if alert_id is None:
+            return jsonify({"success": False, "error": "No alert ID provided"}), 400
+        
+        alerts = load_alerts()
+        
+        if alert_id >= len(alerts):
+            return jsonify({"success": False, "error": "Invalid alert ID"}), 404
+        
+        # Update alert status
+        alerts[alert_id]["status"] = "resolved"
+        alerts[alert_id]["resolved_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Save updated alerts
+        save_alerts(alerts)
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        logger.error(f"Error resolving alert: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# Add error handling for non-working channels
+def check_channel_status(url, mac, token, proxy):
+    try:
+        response = stb.make_request(url, proxy)
+        if not response or response.status_code != 200:
+            add_alert("error", "Channel Check", f"Channel not responding: {url}")
+            return False
+        return True
+    except Exception as e:
+        add_alert("error", "Channel Check", f"Error checking channel {url}: {str(e)}")
+        return False
 
 if __name__ == "__main__":
     config = loadConfig()

@@ -84,12 +84,14 @@
             border: 1px solid var(--border-light);
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            color: var(--primary-text);
         }
 
         .card-header {
             border-bottom: 1px solid var(--border-light);
             background: var(--accent-bg);
             padding: 1rem;
+            color: var(--primary-text);
         }
 
         .card-footer {
@@ -102,6 +104,7 @@
             background: var(--secondary-bg);
             border: 1px solid var(--border-light);
             border-radius: 12px;
+            color: var(--primary-text);
         }
 
         .modal-header {
@@ -161,17 +164,46 @@
         }
 
         .btn-secondary {
-            background: var(--accent-bg);
-            border-color: var(--border-light);
+            background-color: #30363d;
+            border-color: #30363d;
+            color: #e6edf3;
+            opacity: 0.9;
         }
 
         .btn-secondary:hover {
-            background: var(--secondary-bg);
-            border-color: var(--border-color);
+            background-color: #3c444d;
+            border-color: #3c444d;
+            opacity: 1;
+        }
+
+        .btn-success {
+            background-color: #238636;
+            border-color: #238636;
+            color: #e6edf3;
+            opacity: 0.9;
+        }
+
+        .btn-success:hover {
+            background-color: #2ea043;
+            border-color: #2ea043;
+            opacity: 1;
+        }
+
+        .btn-danger {
+            background-color: #a0302e;
+            border-color: #a0302e;
+            color: #e6edf3;
+            opacity: 0.9;
+        }
+
+        .btn-danger:hover {
+            background-color: #da3633;
+            border-color: #da3633;
+            opacity: 1;
         }
 
         .table {
-            color: var(--secondary-text);
+            color: var(--primary-text);
             border-color: var(--border-light);
         }
 
@@ -185,6 +217,7 @@
         .table td {
             border-bottom: 1px solid var(--border-light);
             padding: 1rem;
+            color: var(--primary-text);
         }
 
         .table tbody tr:hover {
@@ -277,13 +310,82 @@
             background: var(--accent-bg);
             color: var(--primary-text);
         }
+
+        /* Add styles for MAC addresses and expiry dates */
+        .mac-address {
+            font-family: monospace;
+            font-weight: 500;
+            color: var(--primary-text);
+        }
+
+        .expiry-date {
+            font-weight: 500;
+            color: var(--primary-text);
+        }
+
+        /* Improve modal text contrast */
+        .modal-title {
+            color: var(--primary-text);
+        }
+
+        .text-muted {
+            color: #9ba6b5 !important;
+        }
+
+        /* Ensure card header buttons are dimmed */
+        .card-header.btn {
+            background-color: var(--accent-bg);
+            opacity: 0.85;
+            border: 1px solid var(--border-light);
+        }
+
+        .card-header.btn:hover {
+            background-color: var(--accent-bg);
+            opacity: 1;
+            border-color: var(--border-color);
+        }
+
+        /* Notification badge for navbar */
+        .nav-notification {
+            position: absolute;
+            top: 2px;
+            right: 0;
+            min-width: 16px;
+            height: 16px;
+            padding: 0 4px;
+            font-size: 10px;
+            font-weight: 600;
+            line-height: 16px;
+            text-align: center;
+            color: #ffffff;
+            background: linear-gradient(45deg, #dc3545, #ff4757);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
+            transform: scale(0.9);
+            transition: transform 0.2s ease;
+        }
+
+        .nav-notification:empty {
+            display: none;
+        }
+
+        /* Position the notification relative to its parent */
+        .nav-item {
+            position: relative;
+            padding-right: 12px;  /* Make room for the badge */
+        }
+
+        /* Hover effect for the badge */
+        .nav-item:hover .nav-notification {
+            transform: scale(1);
+        }
     </style>
 </head>
 
 <body>
     <nav class="navbar navbar-expand-lg navbar-light mb-3 mb-lg-3 mt-lg-5 mx-lg-5">
         <div class="container-fluid">
-            <a class="navbar-brand" target="_blank" href="https://github.com/Chris230291/STB-Proxy">
+            <a class="navbar-brand" target="_blank">
                 <img src="../static/tv.png" alt="" width="24" class="d-inline-block align-text-top">
                 STB ReStreamer
             </a>
@@ -310,8 +412,18 @@
                         <a class="nav-link" href="/dashboard"><i class="fa fa-dashboard"></i> Dashboard</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="/alerts">
+                            <i class="fa fa-bell"></i> Alerts
+                            <span class="nav-notification" id="unresolved-alerts"></span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" target="_blank" href="/playlist"><i class="fa fa-file-video-o"></i>
                             Playlist</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" target="_blank" href="/groups_playlist"><i class="fa fa-folder-o"></i>
+                            Groups Playlist</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" target="_blank" href="/xmltv"><i class="fa fa-file-code-o"></i> XMLTV</a>
@@ -355,4 +467,24 @@
             event.preventDefault();
         }
     });
+
+    // Update unresolved alerts count
+    function updateUnresolvedAlerts() {
+        fetch('/alerts/unresolved/count')
+            .then(response => response.json())
+            .then(data => {
+                const badge = document.getElementById('unresolved-alerts');
+                if (data.count > 0) {
+                    badge.textContent = data.count;
+                    badge.style.display = 'inline-flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            })
+            .catch(error => console.error('Error fetching alerts count:', error));
+    }
+
+    // Update alerts count on page load and every 30 seconds
+    updateUnresolvedAlerts();
+    setInterval(updateUnresolvedAlerts, 30000);
 </script>
