@@ -14,11 +14,23 @@
                     </button>
                 </div>
                 <div class="list-group list-group-flush" id="groupsList">
-                    {% for group_name, channels in channel_groups.items() %}
-                        <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" 
-                           onclick="selectGroup('{{ group_name }}')">
-                            {{ group_name }}
-                            <span class="badge bg-primary rounded-pill">{{ channels|length }}</span>
+                    {% for group_name, group_data in channel_groups.items()|sort(attribute='1.order') %}
+                        <a href="#" class="list-group-item list-group-item-action" 
+                           onclick="selectGroup('{{ group_name }}')"
+                           data-group-name="{{ group_name }}">
+                            <div class="d-flex align-items-center">
+                                <span class="drag-handle me-2" style="cursor: move;">
+                                    <i class="fa fa-bars text-muted"></i>
+                                </span>
+                                {% if group_data.logo %}
+                                    <img src="{{ group_data.logo }}" alt="{{ group_name }}" class="me-2" style="width: 24px; height: 24px; object-fit: contain;">
+                                {% endif %}
+                                <span class="flex-grow-1">{{ group_name }}</span>
+                                <button class="btn btn-sm btn-outline-secondary me-2" onclick="event.stopPropagation(); copyGroupUrl('{{ group_name }}')" title="Copy Group URL">
+                                    <i class="fa fa-link"></i>
+                                </button>
+                                <span class="badge bg-primary rounded-pill">{{ group_data.channels|length }}</span>
+                            </div>
                         </a>
                     {% endfor %}
                 </div>
@@ -30,8 +42,18 @@
             <div class="card mb-3">
                 <div class="card-header">
                     <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0" id="selectedGroupName">Select a group</h5>
+                        <div class="d-flex align-items-center">
+                            <h5 class="mb-0 me-3" id="selectedGroupName">Select a group</h5>
+                            <div id="groupLogo" class="me-3"></div>
+                            <button class="btn btn-sm btn-outline-primary" onclick="document.getElementById('logoInput').click()" id="uploadLogoBtn" style="display: none;">
+                                <i class="fa fa-image"></i> Change Logo
+                            </button>
+                            <input type="file" id="logoInput" style="display: none;" accept="image/*" onchange="uploadLogo(event)">
+                        </div>
                         <div class="btn-group" id="groupActions" style="display: none;">
+                            <button class="btn btn-primary btn-sm me-2" onclick="saveChannelOrder()">
+                                <i class="fa fa-save"></i> Save Order
+                            </button>
                             <button class="btn btn-danger btn-sm" onclick="deleteSelectedGroup()">
                                 <i class="fa fa-trash"></i> Delete Group
                             </button>
@@ -67,6 +89,8 @@
                         <table class="table table-hover" id="channelsTable" style="display: none;">
                             <thead>
                                 <tr>
+                                    <th style="width: 50px">#</th>
+                                    <th>Channel Name</th>
                                     <th>Channel ID</th>
                                     <th>Portal</th>
                                     <th>Actions</th>
@@ -103,11 +127,140 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
 let selectedGroup = '';
 const createGroupModal = new bootstrap.Modal(document.getElementById('createGroupModal'));
 const channelGroups = {{ channel_groups|tojson|safe }};
 const portals = {{ portals|tojson|safe }};
+
+// Initialize Sortable for groups and channels
+let groupsSortable = null;
+let channelsSortable = null;
+
+function initSortables() {
+    // Initialize groups sorting
+    const groupsList = document.getElementById('groupsList');
+    if (groupsSortable) {
+        groupsSortable.destroy();
+    }
+    groupsSortable = new Sortable(groupsList, {
+        animation: 150,
+        handle: '.drag-handle',
+        onEnd: function() {
+            saveGroupOrder();
+        }
+    });
+
+    // Initialize channels sorting
+    const channelsList = document.getElementById('channelsList');
+    if (channelsSortable) {
+        channelsSortable.destroy();
+    }
+    channelsSortable = new Sortable(channelsList, {
+        animation: 150,
+        handle: '.drag-handle',
+        onEnd: function() {
+            updateRowNumbers();
+        }
+    });
+}
+
+function updateRowNumbers() {
+    const rows = document.querySelectorAll('#channelsList tr');
+    rows.forEach((row, index) => {
+        row.querySelector('.row-number').textContent = index + 1;
+    });
+}
+
+function saveGroupOrder() {
+    const groups = Array.from(document.querySelectorAll('#groupsList .list-group-item'))
+        .map(item => item.dataset.groupName);
+
+    fetch('/channels/reorder_groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groups: groups })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            flash('Group order saved successfully', 'success');
+        }
+    });
+}
+
+function uploadLogo(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('logo', file);
+    formData.append('group_name', selectedGroup);
+
+    fetch('/channels/upload_logo', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            channelGroups[selectedGroup].logo = data.logo_url;
+            updateGroupLogo();
+            updateGroupsList();
+            flash('Logo uploaded successfully', 'success');
+        }
+    });
+}
+
+function updateGroupLogo() {
+    const logoContainer = document.getElementById('groupLogo');
+    const logo = channelGroups[selectedGroup]?.logo;
+    
+    if (logo) {
+        logoContainer.innerHTML = `<img src="${logo}" alt="${selectedGroup}" style="width: 32px; height: 32px; object-fit: contain;">`;
+    } else {
+        logoContainer.innerHTML = '';
+    }
+}
+
+function updateGroupsList() {
+    const groupsList = document.getElementById('groupsList');
+    groupsList.innerHTML = '';
+    
+    // Sort groups by order (order starts from 1)
+    const sortedGroups = Object.entries(channelGroups)
+        .sort((a, b) => a[1].order - b[1].order);
+
+    sortedGroups.forEach(([groupName, groupData]) => {
+        const a = document.createElement('a');
+        a.href = '#';
+        a.className = 'list-group-item list-group-item-action';
+        a.onclick = () => selectGroup(groupName);
+        a.dataset.groupName = groupName;
+        if (groupName === selectedGroup) {
+            a.classList.add('active');
+        }
+
+        a.innerHTML = `
+            <div class="d-flex align-items-center">
+                <span class="drag-handle me-2" style="cursor: move;">
+                    <i class="fa fa-bars text-muted"></i>
+                </span>
+                ${groupData.logo ? `<img src="${groupData.logo}" alt="${groupName}" class="me-2" style="width: 24px; height: 24px; object-fit: contain;">` : ''}
+                <span class="flex-grow-1">${groupName}</span>
+                <button class="btn btn-sm btn-outline-secondary me-2" onclick="event.stopPropagation(); copyGroupUrl('${groupName}')" title="Copy Group URL">
+                    <i class="fa fa-link"></i>
+                </button>
+                <span class="badge bg-primary rounded-pill">${groupData.channels.length}</span>
+            </div>
+        `;
+        
+        groupsList.appendChild(a);
+    });
+
+    initSortables();
+}
 
 function createNewGroup() {
     createGroupModal.show();
@@ -138,15 +291,10 @@ function selectGroup(groupName) {
     document.getElementById('groupActions').style.display = 'block';
     document.getElementById('addChannelForm').style.display = 'block';
     document.getElementById('channelsTable').style.display = 'table';
+    document.getElementById('uploadLogoBtn').style.display = 'block';
     
-    // Update active state in groups list
-    document.querySelectorAll('#groupsList .list-group-item').forEach(item => {
-        item.classList.remove('active');
-        if (item.textContent.trim() === groupName) {
-            item.classList.add('active');
-        }
-    });
-    
+    updateGroupLogo();
+    updateGroupsList();
     updateChannelsList();
 }
 
@@ -154,22 +302,103 @@ function updateChannelsList() {
     const tbody = document.getElementById('channelsList');
     tbody.innerHTML = '';
     
-    const channels = channelGroups[selectedGroup] || [];
-    channels.forEach(channel => {
+    const channels = channelGroups[selectedGroup]?.channels || [];
+    channels.forEach((channel, index) => {
         const tr = document.createElement('tr');
         const portalName = channel.portalId in portals ? portals[channel.portalId].name : channel.portalId;
         
         tr.innerHTML = `
+            <td>
+                <span class="drag-handle me-2" style="cursor: move;">
+                    <i class="fa fa-bars text-muted"></i>
+                </span>
+                <span class="row-number">${index + 1}</span>
+            </td>
+            <td>${channel.channelName || 'Unknown Channel'}</td>
             <td>${channel.channelId}</td>
             <td>${portalName}</td>
             <td>
-                <button class="btn btn-sm btn-danger" onclick="removeChannel('${channel.channelId}', '${channel.portalId}')">
-                    <i class="fa fa-times"></i>
-                </button>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-secondary me-1" onclick="moveChannel(${index}, -1)" ${index === 0 ? 'disabled' : ''}>
+                        <i class="fa fa-arrow-up"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary me-1" onclick="moveChannel(${index}, 1)" ${index === channels.length - 1 ? 'disabled' : ''}>
+                        <i class="fa fa-arrow-down"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="removeChannel('${channel.channelId}', '${channel.portalId}')">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
             </td>
         `;
         tbody.appendChild(tr);
     });
+}
+
+function moveChannel(index, direction) {
+    const channels = channelGroups[selectedGroup].channels;
+    if (index + direction >= 0 && index + direction < channels.length) {
+        const temp = channels[index];
+        channels[index] = channels[index + direction];
+        channels[index + direction] = temp;
+        updateChannelsList();
+    }
+}
+
+function saveChannelOrder() {
+    const channels = [];
+    document.querySelectorAll('#channelsList tr').forEach(row => {
+        const channelName = row.querySelector('td:nth-child(2)').textContent.trim();
+        const channelId = row.querySelector('td:nth-child(3)').textContent.trim();
+        const portalName = row.querySelector('td:nth-child(4)').textContent.trim();
+        
+        // Find the portal ID based on the portal name
+        let portalId = '';
+        for (const [id, portal] of Object.entries(portals)) {
+            if (portal.name === portalName) {
+                portalId = id;
+                break;
+            }
+        }
+        
+        channels.push({
+            channelId: channelId,
+            portalId: portalId,
+            channelName: channelName
+        });
+    });
+
+    fetch('/channels/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            group_name: selectedGroup,
+            channels: channels
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            channelGroups[selectedGroup].channels = data.channels;
+            updateChannelsList();
+            flash('Channel order saved successfully', 'success');
+        }
+    });
+}
+
+function flash(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show mx-lg-5`;
+    alertDiv.role = 'alert';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.querySelector('.container-fluid').insertBefore(alertDiv, document.querySelector('.row'));
+    
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 4000);
 }
 
 function addChannels(event) {
@@ -189,7 +418,7 @@ function addChannels(event) {
     .then(response => response.json())
     .then(data => {
         if (data.status === 'success') {
-            channelGroups[selectedGroup] = data.channels;
+            channelGroups[selectedGroup].channels = data.channels;
             updateChannelsList();
             event.target.reset();
         }
@@ -211,8 +440,9 @@ function removeChannel(channelId, portalId) {
     .then(response => response.json())
     .then(data => {
         if (data.status === 'success') {
-            channelGroups[selectedGroup] = data.channels;
+            channelGroups[selectedGroup].channels = data.channels;
             updateChannelsList();
+            updateGroupsList();
         }
     });
 }
@@ -233,6 +463,19 @@ function deleteSelectedGroup() {
         });
     }
 }
+
+function copyGroupUrl(groupName) {
+    const url = window.location.origin + '/chplay/' + encodeURIComponent(groupName);
+    navigator.clipboard.writeText(url).then(() => {
+        flash('Group URL copied to clipboard', 'success');
+    }).catch(err => {
+        console.error('Failed to copy URL: ', err);
+        flash('Failed to copy URL', 'danger');
+    });
+}
+
+// Initialize sortables on page load
+initSortables();
 </script>
 
 {% endblock %}

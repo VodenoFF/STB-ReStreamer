@@ -118,10 +118,20 @@
 
 
     function getGroupOptions(selectedGroup) {
-        let options = '<option value="">No Group</option>';
-        {% for group_name in channel_groups.keys() %}
-            options += `<option value="{{ group_name }}" ${selectedGroup === "{{ group_name }}" ? 'selected' : ''}>{{ group_name }}</option>`;
-        {% endfor %}
+        let options = '';
+        let groupNames = [{% for group_name in channel_groups.keys() %}"{{ group_name }}", {% endfor %}];
+        
+        // Sort group names alphabetically
+        groupNames.sort();
+        
+        // Add sorted groups
+        groupNames.forEach(groupName => {
+            options += `<option value="${groupName}" ${selectedGroup === groupName ? 'selected' : ''}>${groupName}</option>`;
+        });
+        
+        // Add "No Group" at the end
+        options += '<option value="" ' + (selectedGroup === '' ? 'selected' : '') + '>No Group</option>';
+        
         return options;
     }
 
@@ -202,6 +212,15 @@
     };
 
     $(document).ready(function () {
+        // Add custom sorting for groups
+        $.fn.dataTable.ext.order['dom-select'] = function (settings, col) {
+            return this.api().column(col, { order: 'index' }).nodes().map(function (td, i) {
+                let select = $('select', td);
+                let value = select.val() || '';
+                return value === '' ? 'zzzzzz' : value.toLowerCase();
+            });
+        };
+
         $('#table').DataTable({
             dom: "<'row m-1'<'col-auto'B><'col-auto ms-auto'f><'col-auto'l>>" +
                 "<'row'<'col-12'tr>>" +
@@ -219,9 +238,8 @@
                 { targets: 4, className: "align-middle", orderDataType: "dom-text", type: 'string' },
                 { targets: 5, className: "align-middle", orderDataType: "dom-text-numeric" },
                 { targets: 6, className: "align-middle", orderDataType: "dom-text", type: 'string' },
-                { targets: 7, className: "align-middle", orderDataType: "dom-text", type: 'string' },
+                { targets: 7, className: "align-middle", orderDataType: "dom-select" },
                 { targets: 8, className: "align-middle" }
-
             ],
             language: {
                 search: "",
@@ -371,19 +389,25 @@
                 },
                 
                 {
-                    data: "channelId",
+                    data: "group",
                     render: function (data, type, row, meta) {
+                        if (type === 'sort') {
+                            return data === '' ? 'zzzzzz' : data.toLowerCase();
+                        }
                         return '<select \
                                 class="form-select" \
                                 style="min-width: 200px;" \
                                 onchange="editGroup(this)" \
                                 data-portal="' + row.portal + '" \
                                 data-channelId="' + row.channelId + '">' +
-                                getGroupOptions(row.group) +
+                                getGroupOptions(data) +
                                 '</select>';
                     }
                 },
-                { data: "portalName" },
+                { 
+                    data: "portalName",
+                    className: "align-middle"
+                },
             ],
         });
     });

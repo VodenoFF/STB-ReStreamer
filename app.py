@@ -21,6 +21,7 @@ from flask import (
 import stb
 import waitress
 import xml.etree.cElementTree as ET
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = secrets.token_urlsafe(32)
@@ -135,10 +136,45 @@ def getChannelGroups():
     try:
         with open(os.path.join(basePath, "channel_groups.json")) as f:
             groups = json.load(f)
+            # Convert old format to new format if needed
+            if groups and isinstance(next(iter(groups.values())), list):
+                new_groups = {}
+                for group_name, channels in groups.items():
+                    new_groups[group_name] = {
+                        "channels": channels,
+                        "logo": "",
+                        "order": len(new_groups) + 1
+                    }
+                groups = new_groups
+                saveChannelGroups(groups)
+            
+            # Add channel names to existing channels if missing
+            portals = getPortals()
+            for group_name, group_data in groups.items():
+                if "channels" in group_data:
+                    for channel in group_data["channels"]:
+                        if isinstance(channel, dict) and "channelName" not in channel:
+                            portal_id = channel.get("portalId")
+                            if portal_id in portals:
+                                portal = portals[portal_id]
+                                try:
+                                    name_path = os.path.join(parent_folder, f"{portal['name']}.json")
+                                    with open(name_path, 'r') as file:
+                                        all_channels = json.load(file)
+                                        channel_lookup = {str(ch["id"]): ch["name"] for ch in all_channels}
+                                        channel["channelName"] = channel_lookup.get(channel["channelId"], "Unknown Channel")
+                                except:
+                                    channel["channelName"] = "Unknown Channel"
+                    
+            saveChannelGroups(groups)
     except FileNotFoundError:
         # Create default group if file doesn't exist
         groups = {
-            "Default Group": []  # Default group with empty channel list
+            "Default Group": {
+                "channels": [],
+                "logo": "",
+                "order": 1
+            }
         }
         saveChannelGroups(groups)
     return groups
@@ -382,11 +418,12 @@ def editor_data():
 
                     # Determine the group for this channel
                     group = ""
-                    for group_name, group_channels in channel_groups.items():
-                        for ch in group_channels:
-                            if isinstance(ch, dict) and ch.get('channelId') == channelId:
-                                group = group_name
-                                break
+                    for group_name, group_data in channel_groups.items():
+                        if "channels" in group_data:
+                            for ch in group_data["channels"]:
+                                if isinstance(ch, dict) and ch.get('channelId') == channelId and ch.get('portalId') == portal:
+                                    group = group_name
+                                    break
                         if group:
                             break
 
@@ -462,22 +499,31 @@ def editorSave():
         group = edit["group"]
 
         # Remove channel from all existing groups first
-        for g in channel_groups.values():
-            # Each entry in the group is now a dict with channelId and portalId
-            g[:] = [ch for ch in g if not (isinstance(ch, dict) and ch.get('channelId') == channelId)]
+        for group_name, group_data in channel_groups.items():
+            if "channels" in group_data:
+                group_data["channels"] = [
+                    ch for ch in group_data["channels"] 
+                    if not (isinstance(ch, dict) and 
+                           ch.get("channelId") == channelId and 
+                           ch.get("portalId") == portal)
+                ]
 
         # Add to new group if one is selected
         if group:
             if group not in channel_groups:
-                channel_groups[group] = []
+                channel_groups[group] = {
+                    "channels": [],
+                    "logo": "",
+                    "order": max([g.get("order", 0) for g in channel_groups.values()], default=0) + 1
+                }
             
             # Add as dict with both channelId and portalId
             channel_entry = {
-                'channelId': channelId,
-                'portalId': portal
+                "channelId": channelId,
+                "portalId": portal
             }
-            if channel_entry not in channel_groups[group]:
-                channel_groups[group].append(channel_entry)
+            if channel_entry not in channel_groups[group]["channels"]:
+                channel_groups[group]["channels"].append(channel_entry)
 
     saveChannelGroups(channel_groups)
     logger.info("Playlist config saved!")
@@ -738,18 +784,19 @@ def channel(portalId, channelId):
         
         # Find which group this channel belongs to
         channelGroup = None
-        for group_name, channels in channelGroups.items():
-            for ch in channels:
-                if isinstance(ch, dict) and ch.get('channelId') == channelId:
-                    channelGroup = group_name
-                    break
+        for group_name, group_data in channelGroups.items():
+            if "channels" in group_data:
+                for ch in group_data["channels"]:
+                    if isinstance(ch, dict) and ch.get('channelId') == channelId and ch.get('portalId') == portalId:
+                        channelGroup = group_name
+                        break
             if channelGroup:
                 break
 
         if channelGroup:
             logger.info(f"Found channel in group: {channelGroup}")
             # Try all other channels in the same group
-            for channel_entry in channelGroups[channelGroup]:
+            for channel_entry in channelGroups[channelGroup]["channels"]:
                 if not isinstance(channel_entry, dict):
                     continue
                     
@@ -996,22 +1043,52 @@ def add_channels():
     if group_name not in channel_groups:
         return jsonify({"status": "error", "message": "Group not found"}), 404
         
-    # Add new channels to the group
-    for channel_id in channel_ids:
-        channel_id = channel_id.strip()
-        if channel_id:
-            new_entry = {
-                "channelId": channel_id,
-                "portalId": portal_id
-            }
-            if new_entry not in channel_groups[group_name]:
-                channel_groups[group_name].append(new_entry)
+    # Get portal info
+    portals = getPortals()
+    if portal_id not in portals:
+        return jsonify({"status": "error", "message": "Portal not found"}), 404
     
-    saveChannelGroups(channel_groups)
-    return jsonify({
-        "status": "success",
-        "channels": channel_groups[group_name]
-    })
+    portal = portals[portal_id]
+    portal_name = portal["name"]
+    
+    try:
+        # Load channel data from portal's JSON file
+        name_path = os.path.join(parent_folder, f"{portal_name}.json")
+        with open(name_path, 'r') as file:
+            all_channels = json.load(file)
+            
+        # Create channel name lookup
+        channel_lookup = {str(ch["id"]): ch["name"] for ch in all_channels}
+        
+        # Add new channels to the group
+        for channel_id in channel_ids:
+            channel_id = channel_id.strip()
+            if channel_id:
+                channel_name = channel_lookup.get(channel_id, "Unknown Channel")
+                new_entry = {
+                    "channelId": channel_id,
+                    "portalId": portal_id,
+                    "channelName": channel_name
+                }
+                # Check if channel already exists
+                exists = False
+                for existing_channel in channel_groups[group_name]["channels"]:
+                    if (existing_channel.get("channelId") == channel_id and 
+                        existing_channel.get("portalId") == portal_id):
+                        exists = True
+                        break
+                
+                if not exists:
+                    channel_groups[group_name]["channels"].append(new_entry)
+        
+        saveChannelGroups(channel_groups)
+        return jsonify({
+            "status": "success",
+            "channels": channel_groups[group_name]["channels"]
+        })
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Error loading channel data: {str(e)}"}), 500
 
 @app.route("/channels/remove_channel", methods=["POST"])
 @authorise
@@ -1026,8 +1103,8 @@ def remove_channel():
         return jsonify({"status": "error", "message": "Group not found"}), 404
         
     # Remove the channel from the group
-    channel_groups[group_name] = [
-        ch for ch in channel_groups[group_name] 
+    channel_groups[group_name]["channels"] = [
+        ch for ch in channel_groups[group_name]["channels"] 
         if not (isinstance(ch, dict) and 
                 ch.get("channelId") == channel_id and 
                 ch.get("portalId") == portal_id)
@@ -1036,7 +1113,7 @@ def remove_channel():
     saveChannelGroups(channel_groups)
     return jsonify({
         "status": "success",
-        "channels": channel_groups[group_name]
+        "channels": channel_groups[group_name]["channels"]
     })
 
 @app.route("/channels/create", methods=["POST"])
@@ -1051,15 +1128,129 @@ def create_group():
     channel_groups = getChannelGroups()
     if group_name in channel_groups:
         return jsonify({"status": "error", "message": "Group already exists"}), 400
+    
+    # Get the next order number starting from 1
+    next_order = max([group["order"] for group in channel_groups.values()], default=0) + 1
         
-    channel_groups[group_name] = []
+    channel_groups[group_name] = {
+        "channels": [],
+        "logo": "",
+        "order": next_order
+    }
     saveChannelGroups(channel_groups)
     
     return jsonify({"status": "success"})
+
+@app.route("/channels/reorder", methods=["POST"])
+@authorise
+def reorder_channels():
+    data = request.get_json()
+    group_name = data.get("group_name")
+    new_channels = data.get("channels")
+    
+    if not group_name or not new_channels:
+        return jsonify({"status": "error", "message": "Missing required parameters"}), 400
+    
+    channel_groups = getChannelGroups()
+    if group_name not in channel_groups:
+        return jsonify({"status": "error", "message": "Group not found"}), 404
+    
+    channel_groups[group_name]["channels"] = new_channels
+    saveChannelGroups(channel_groups)
+    
+    return jsonify({
+        "status": "success",
+        "channels": channel_groups[group_name]["channels"]
+    })
+
+@app.route("/channels/upload_logo", methods=["POST"])
+@authorise
+def upload_group_logo():
+    if 'logo' not in request.files or 'group_name' not in request.form:
+        return jsonify({"status": "error", "message": "Missing logo or group name"}), 400
+        
+    file = request.files['logo']
+    group_name = request.form['group_name']
+    
+    if file.filename == '':
+        return jsonify({"status": "error", "message": "No file selected"}), 400
+        
+    if not file.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+        return jsonify({"status": "error", "message": "Invalid file type"}), 400
+    
+    channel_groups = getChannelGroups()
+    if group_name not in channel_groups:
+        return jsonify({"status": "error", "message": "Group not found"}), 404
+    
+    # Create logos directory if it doesn't exist
+    logos_dir = os.path.join(basePath, "static", "logos")
+    os.makedirs(logos_dir, exist_ok=True)
+    
+    # Save the file with a unique name
+    filename = f"group_{uuid.uuid4().hex[:8]}_{secure_filename(file.filename)}"
+    file_path = os.path.join(logos_dir, filename)
+    file.save(file_path)
+    
+    # Update group logo path
+    channel_groups[group_name]["logo"] = f"/static/logos/{filename}"
+    saveChannelGroups(channel_groups)
+    
+    return jsonify({
+        "status": "success",
+        "logo_url": channel_groups[group_name]["logo"]
+    })
+
+@app.route("/channels/reorder_groups", methods=["POST"])
+@authorise
+def reorder_groups():
+    data = request.get_json()
+    new_order = data.get("groups")
+    
+    if not new_order:
+        return jsonify({"status": "error", "message": "Missing groups order"}), 400
+    
+    channel_groups = getChannelGroups()
+    
+    # Update group orders starting from 1
+    for index, group_name in enumerate(new_order, start=1):
+        if group_name in channel_groups:
+            channel_groups[group_name]["order"] = index
+    
+    saveChannelGroups(channel_groups)
+    return jsonify({"status": "success"})
+
+@app.route("/chplay/<groupID>", methods=["GET"])
+def chplay(groupID):
+    group_name = groupID
+    if not group_name:
+        return make_response("Group parameter is required", 400)
+    
+    channel_groups = getChannelGroups()
+    if group_name not in channel_groups:
+        return make_response(f"Group '{group_name}' not found", 404)
+    
+    # Get all channels in the group
+    if "channels" not in channel_groups[group_name]:
+        return make_response(f"Invalid group structure for '{group_name}'", 404)
+        
+    channels = channel_groups[group_name]["channels"]
+    if not channels:
+        return make_response(f"No channels found in group '{group_name}'", 404)
+    
+    # Try each channel in the group until we find one that works
+    for channel in channels:
+        if isinstance(channel, dict):
+            portal_id = channel.get("portalId")
+            channel_id = channel.get("channelId")
+            if portal_id and channel_id:
+                # Redirect to the play route for this channel
+                return redirect(f"/play/{portal_id}/{channel_id}")
+    
+    return make_response(f"No valid channels found in group '{group_name}'", 404)
 
 if __name__ == "__main__":
     config = loadConfig()
     if "TERM_PROGRAM" in os.environ.keys() and os.environ["TERM_PROGRAM"] == "vscode":
         app.run(host="0.0.0.0", port=8001, debug=True)
     else:
-        waitress.serve(app, port=8001, _quiet=True, threads=24)
+        waitress.serve(app, port=8001, _quiet=True, threads=12)
