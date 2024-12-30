@@ -17,6 +17,7 @@
                 <th>Number</th>
                 <th>EPG ID</th>
                 <th>Fallback For</th>
+                <th>Group</th>
                 <th>Portal</th>
             </tr>
         </thead>
@@ -31,6 +32,7 @@
         <input type="text" id="genreEdits" name="genreEdits" value="">
         <input type="text" id="epgEdits" name="epgEdits" value="">
         <input type="text" id="fallbackEdits" name="fallbackEdits" value="">
+        <input type="text" id="groupEdits" name="groupEdits" value="">
     </form>
 
     <form action="/editor/reset" method="post" id="reset" hidden>
@@ -62,6 +64,7 @@
     var genreEdits = [];
     var epgEdits = [];
     var fallbackEdits = [];
+    var groupEdits = [];
 
     function editAll(ele) {
         var checkboxes = document.getElementsByClassName('checkbox');
@@ -121,13 +124,39 @@
         var j = { "portal": p, "channel id": i, "channel name": c };
         fallbackEdits.push(j);
     }
+
+    function getGroupOptions(selectedGroup) {
+        let options = '<option value="">No Group</option>';
+        {% for group_name in channel_groups.keys() %}
+            options += `<option value="{{ group_name }}" ${selectedGroup === "{{ group_name }}" ? 'selected' : ''}>{{ group_name }}</option>`;
+        {% endfor %}
+        return options;
+    }
+
+    function editGroup(ele) {
+        var p = ele.getAttribute('data-portal');
+        var i = ele.getAttribute('data-channelId');
+        var c = ele.value;
+        var j = { "portal": p, "channel id": i, "group": c };
+        groupEdits.push(j);
+    }
+
     function copyToClipboard(buttonElement) {
-    const linkToCopy = buttonElement.getAttribute('data-href'); // Get the data-href attribute
-    console.log(linkToCopy);
-    navigator.clipboard.writeText(linkToCopy).then(() => {
-    }).catch(err => {
-        console.error('Failed to copy link: ', err);
-    });
+        const linkToCopy = buttonElement.getAttribute('data-href');
+        let url = linkToCopy;
+        try {
+            const urlObj = new URL(linkToCopy);
+            urlObj.searchParams.delete('web');
+            url = urlObj.toString();
+        } catch (e) {
+            console.error('Invalid URL:', linkToCopy);
+        }
+        
+        navigator.clipboard.writeText(url).then(() => {
+            console.log('Link copied:', url);
+        }).catch(err => {
+            console.error('Failed to copy link: ', err);
+        });
     }
     function save() {
         document.getElementById("enabledEdits").value = JSON.stringify(enabledEdits);
@@ -136,6 +165,7 @@
         document.getElementById("genreEdits").value = JSON.stringify(genreEdits);
         document.getElementById("epgEdits").value = JSON.stringify(epgEdits);
         document.getElementById("fallbackEdits").value = JSON.stringify(fallbackEdits);
+        document.getElementById("groupEdits").value = JSON.stringify(groupEdits);
         document.getElementById("save edits").submit();
     }
 
@@ -198,7 +228,8 @@
                 { targets: 5, className: "align-middle", orderDataType: "dom-text-numeric" },
                 { targets: 6, className: "align-middle", orderDataType: "dom-text", type: 'string' },
                 { targets: 7, className: "align-middle", orderDataType: "dom-text", type: 'string' },
-                { targets: 8, className: "align-middle" }
+                { targets: 8, className: "align-middle" },
+                { targets: 9, className: "align-middle" }
             ],
             language: {
                 search: "",
@@ -358,6 +389,19 @@
                                 data-channelId="' + row.channelId + '" \
                                 value="' + row.fallbackChannel +
                             '">'
+                    }
+                },
+                {
+                    data: "channelId",
+                    render: function (data, type, row, meta) {
+                        return '<select \
+                                class="form-select" \
+                                style="min-width: 200px;" \
+                                onchange="editGroup(this)" \
+                                data-portal="' + row.portal + '" \
+                                data-channelId="' + row.channelId + '">' +
+                                getGroupOptions(row.group) +
+                                '</select>';
                     }
                 },
                 { data: "portalName" },
