@@ -22,6 +22,98 @@ import stb
 import waitress
 import xml.etree.cElementTree as ET
 from werkzeug.utils import secure_filename
+from collections import OrderedDict
+from threading import Lock
+
+class LinkCache:
+    def __init__(self, max_size=1000, default_ttl=8):
+        self.cache = OrderedDict()
+        self.max_size = max_size
+        self.default_ttl = default_ttl
+        self.lock = Lock()
+
+    def get(self, key):
+        with self.lock:
+            if key in self.cache:
+                data = self.cache[key]
+                if time.time() - data['timestamp'] < self.default_ttl:
+                    # Move to end to mark as recently used
+                    self.cache.move_to_end(key)
+                    return data['link'], data.get('ffmpegcmd')
+                else:
+                    # Remove expired entry
+                    del self.cache[key]
+            return None, None
+
+    def set(self, key, link, ffmpegcmd=None):
+        with self.lock:
+            # Remove oldest items if cache is full
+            while len(self.cache) >= self.max_size:
+                self.cache.popitem(last=False)
+            
+            self.cache[key] = {
+                'link': link,
+                'ffmpegcmd': ffmpegcmd,
+                'timestamp': time.time()
+            }
+            # Move to end to mark as recently used
+            self.cache.move_to_end(key)
+
+    def cleanup(self):
+        """Remove expired entries"""
+        with self.lock:
+            now = time.time()
+            expired = [k for k, v in self.cache.items() 
+                      if now - v['timestamp'] > self.default_ttl]
+            for k in expired:
+                del self.cache[k]
+
+class RateLimiter:
+    def __init__(self, default_limit=30, cleanup_interval=300):
+        self.cooldowns = {}  # {key: {'timestamp': time, 'count': n}}
+        self.default_limit = default_limit
+        self.cleanup_interval = cleanup_interval
+        self.last_cleanup = time.time()
+        self.lock = Lock()
+
+    def check_rate(self, key, duration=None):
+        """Check if key is rate limited. Returns (can_access, remaining_time)"""
+        if duration is None:
+            duration = self.default_limit
+            
+        with self.lock:
+            self._cleanup_if_needed()
+            
+            now = time.time()
+            if key in self.cooldowns:
+                last_access = self.cooldowns[key]['timestamp']
+                time_elapsed = now - last_access
+                if time_elapsed < duration:
+                    return False, duration - time_elapsed
+            return True, 0
+
+    def update_rate(self, key):
+        """Update rate limit for key"""
+        with self.lock:
+            now = time.time()
+            self.cooldowns[key] = {
+                'timestamp': now,
+                'count': self.cooldowns.get(key, {}).get('count', 0) + 1
+            }
+
+    def _cleanup_if_needed(self):
+        """Remove expired entries if cleanup interval has passed"""
+        now = time.time()
+        if now - self.last_cleanup > self.cleanup_interval:
+            expired = [k for k, v in self.cooldowns.items() 
+                      if now - v['timestamp'] > self.default_limit]
+            for k in expired:
+                del self.cooldowns[k]
+            self.last_cleanup = now
+
+# Initialize improved caching and rate limiting
+link_cache = LinkCache(max_size=1000, default_ttl=8)
+rate_limiter = RateLimiter(default_limit=30, cleanup_interval=300)
 
 app = Flask(__name__)
 app.secret_key = secrets.token_urlsafe(32)
@@ -682,10 +774,6 @@ def groups_playlist():
     playlist = "#EXTM3U\n" + "\n".join(playlist_entries)
     return Response(playlist, mimetype="text/plain")
 
-# Add channel cooldown tracking
-channel_cooldowns = {}
-COOLDOWN_DURATION = 30  # seconds
-
 @app.route("/play/<portalId>/<channelId>", methods=["GET"])
 def channel(portalId, channelId):
     def streamData():
@@ -774,15 +862,6 @@ def channel(portalId, channelId):
     def isMacFree():
         return sum(1 for i in occupied.get(portalId, []) if i["mac"] == mac) < streamsPerMac
 
-    def check_cooldown():
-        cooldown_key = f"{portalId}:{channelId}"
-        if cooldown_key in channel_cooldowns:
-            last_access = channel_cooldowns[cooldown_key]
-            time_elapsed = time.time() - last_access
-            if time_elapsed < COOLDOWN_DURATION:
-                return False, COOLDOWN_DURATION - time_elapsed
-        return True, 0
-
     portal = getPortals().get(portalId)
     portalName = portal.get("name")
     url = portal.get("url")
@@ -811,9 +890,19 @@ def channel(portalId, channelId):
 
     logger.info(f"IP({ip}) requested Portal({portalId}):Channel({channelId})")
 
-    # Check cooldown
-    can_access, remaining_time = check_cooldown()
-    if not can_access and not web:  # Don't apply cooldown for web preview
+    # Check link cache first before rate limit
+    cached_link, cached_ffmpegcmd = link_cache.get(f"{portalId}:{channelId}")
+    if cached_link:
+        if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
+            if cached_ffmpegcmd:
+                ffmpegcmd = cached_ffmpegcmd
+                return Response(streamData(), mimetype="application/octet-stream")
+        else:
+            return redirect(cached_link, code=302)
+
+    # If no cache hit, check rate limit
+    can_access, remaining_time = rate_limiter.check_rate(f"{portalId}:{channelId}")
+    if not can_access and not web:  # Don't apply rate limit for web preview
         logger.info(f"Channel {channelName} ({channelId}) in cooldown. {remaining_time:.1f} seconds remaining")
         add_alert("warning", f"Portal: {portalName}", f"Channel {channelName} in cooldown. {remaining_time:.1f} seconds remaining. Attempting fallback.")
         
@@ -840,13 +929,18 @@ def channel(portalId, channelId):
                 fallback_channel_id = channel_entry['channelId']
                 fallback_portal_id = channel_entry['portalId']
                 
-                # Skip if it's the same channel or if the fallback is also in cooldown
+                # Check cache for fallback first
                 fallback_key = f"{fallback_portal_id}:{fallback_channel_id}"
-                if (fallback_channel_id == channelId and fallback_portal_id == portalId) or \
-                   (fallback_key in channel_cooldowns and time.time() - channel_cooldowns[fallback_key] < COOLDOWN_DURATION):
+                cached_link, _ = link_cache.get(fallback_key)
+                if cached_link:
+                    return redirect(f"/play/{fallback_portal_id}/{fallback_channel_id}", code=302)
+                
+                # Skip if it's the same channel or if the fallback is also rate limited
+                can_access_fallback, _ = rate_limiter.check_rate(fallback_key)
+                if (fallback_channel_id == channelId and fallback_portal_id == portalId) or not can_access_fallback:
                     continue
 
-                return redirect(f"/play/{fallback_portal_id}/{fallback_channel_id}")
+                return redirect(f"/play/{fallback_portal_id}/{fallback_channel_id}", code=302)
 
         # If no fallback found, return error
         return make_response(f"Channel in cooldown. Please wait {remaining_time:.1f} seconds.", 429)
@@ -860,31 +954,56 @@ def channel(portalId, channelId):
         if streamsPerMac == 0 or isMacFree():
             logger.info(f"Trying Portal({portalId}):MAC({mac}):Channel({channelId})")
             freeMac = True
-            token = stb.getToken(url, mac, proxy)
-            if token:
-                name_path = os.path.join(parent_folder, f"{portalName}.json")
-                with open(name_path, 'r') as file:
-                    channels = json.load(file)
-
-        if channels:
-            for c in channels:
-                if str(c["id"]) == channelId:
-                    channelName = portal.get("custom channel names", {}).get(channelId, c["name"])
-                    cmd = c["cmd"]
-                    break
-
-        if cmd:
-            ids = portal["ids"][mac]
-            stb.getProfile(url, mac, token, ids["device_id"], ids["device_id2"], ids["signature"], ids["timestamp"], proxy)
-            if "http://localhost/" in cmd or "http:///ch/" in cmd:
-                link = stb.getLink(url, mac, token, cmd, proxy)
+            
+            # Check link cache first
+            cached_link, cached_ffmpegcmd = link_cache.get(f"{portalId}:{channelId}")
+            if cached_link:
+                link = cached_link
+                if cached_ffmpegcmd:
+                    ffmpegcmd = cached_ffmpegcmd
             else:
-                link = cmd.split(" ")[1]
+                # Get fresh link if not cached
+                token = stb.getToken(url, mac, proxy)
+                if token:
+                    name_path = os.path.join(parent_folder, f"{portalName}.json")
+                    with open(name_path, 'r') as file:
+                        channels = json.load(file)
+
+                if channels:
+                    for c in channels:
+                        if str(c["id"]) == channelId:
+                            channelName = portal.get("custom channel names", {}).get(channelId, c["name"])
+                            cmd = c["cmd"]
+                            break
+
+                if cmd:
+                    ids = portal["ids"][mac]
+                    stb.getProfile(url, mac, token, ids["device_id"], ids["device_id2"], ids["signature"], ids["timestamp"], proxy)
+                    if "http://localhost/" in cmd or "http:///ch/" in cmd:
+                        link = stb.getLink(url, mac, token, cmd, proxy)
+                    else:
+                        # Handle direct link commands more safely
+                        parts = cmd.split(" ")
+                        link = parts[1] if len(parts) > 1 else cmd
 
         if link:
             if getSettings().get("test streams", "true") == "false" or testStream():
-                # Update cooldown timestamp
-                channel_cooldowns[f"{portalId}:{channelId}"] = time.time()
+                # Cache the link and ffmpeg command if needed
+                if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
+                    ffmpegcmd = str(getSettings()["ffmpeg command"])
+                    ffmpegcmd = ffmpegcmd.replace("<url>", link)
+                    ffmpegcmd = ffmpegcmd.replace("<timeout>", str(int(getSettings()["ffmpeg timeout"]) * 1000000))
+                    if proxy:
+                        ffmpegcmd = ffmpegcmd.replace("<proxy>", proxy)
+                    else:
+                        ffmpegcmd = ffmpegcmd.replace("-http_proxy <proxy>", "")
+                    ffmpegcmd = " ".join(ffmpegcmd.split()).split()
+                    link_cache.set(f"{portalId}:{channelId}", link, ffmpegcmd)
+                else:
+                    link_cache.set(f"{portalId}:{channelId}", link)
+
+                # Update rate limit
+                rate_limiter.update_rate(f"{portalId}:{channelId}")
                 
                 if web:
                     ffmpegcmd = [
@@ -908,18 +1027,10 @@ def channel(portalId, channelId):
                     return Response(streamData(), mimetype="application/octet-stream")
                 else:
                     if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
-                        ffmpegcmd = str(getSettings()["ffmpeg command"])
-                        ffmpegcmd = ffmpegcmd.replace("<url>", link)
-                        ffmpegcmd = ffmpegcmd.replace("<timeout>", str(int(getSettings()["ffmpeg timeout"]) * 1000000))
-                        if proxy:
-                            ffmpegcmd = ffmpegcmd.replace("<proxy>", proxy)
-                        else:
-                            ffmpegcmd = ffmpegcmd.replace("-http_proxy <proxy>", "")
-                        ffmpegcmd = " ".join(ffmpegcmd.split()).split()
                         return Response(streamData(), mimetype="application/octet-stream")
                     else:
                         logger.info("Redirect sent")
-                        return redirect(link)
+                        return redirect(link, code=302)
 
         logger.info(f"Unable to connect to Portal({portalId}) using MAC({mac})")
         logger.info(f"Moving MAC({mac}) for Portal({portalName})")
@@ -956,9 +1067,20 @@ def channel(portalId, channelId):
                 fallbackChannelId = channel_entry['channelId']
                 fallbackPortalId = channel_entry['portalId']
                 
-                # Skip if the fallback channel is in cooldown
+                # Check cache for fallback first
                 fallback_key = f"{fallbackPortalId}:{fallbackChannelId}"
-                if fallback_key in channel_cooldowns and time.time() - channel_cooldowns[fallback_key] < COOLDOWN_DURATION:
+                cached_link, cached_ffmpegcmd = link_cache.get(fallback_key)
+                if cached_link:
+                    if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
+                        if cached_ffmpegcmd:
+                            ffmpegcmd = cached_ffmpegcmd
+                            return Response(streamData(), mimetype="application/octet-stream")
+                    else:
+                        return redirect(cached_link, code=302)
+                
+                # Skip if the fallback channel is rate limited
+                can_access_fallback, _ = rate_limiter.check_rate(fallback_key)
+                if not can_access_fallback:
                     continue
                 
                 if fallbackChannelId != channelId:  # Don't try the same channel
@@ -971,48 +1093,62 @@ def channel(portalId, channelId):
                             cmd = None
                             link = None
                             if streamsPerMac == 0 or isMacFree():
-                                try:
-                                    token = stb.getToken(url, mac, proxy)
-                                    ids = portals[fallbackPortalId]["ids"][mac]
-                                    stb.getProfile(url, mac, token, ids["device_id"], ids["device_id2"], ids["signature"], ids["timestamp"], proxy)
-                                    name_path = os.path.join(parent_folder, f"{portals[fallbackPortalId]['name']}.json")
-                                    with open(name_path, 'r') as file:
-                                        channels = json.load(file)
-                                except:
-                                    logger.info(f"Unable to connect to fallback Portal({fallbackPortalId}) using MAC({mac})")
-                                    add_alert("warning", f"Portal: {portals[fallbackPortalId]['name']}", f"Failed to connect to fallback portal using MAC {mac}")
-                                if channels:
-                                    for c in channels:
-                                        if str(c["id"]) == fallbackChannelId:
-                                            channelName = portals[fallbackPortalId].get("custom channel names", {}).get(fallbackChannelId, c["name"])
-                                            cmd = c["cmd"]
-                                            break
-                                    if cmd:
+                                # Check link cache first for fallback
+                                cached_link, cached_ffmpegcmd = link_cache.get(fallback_key)
+                                if cached_link:
+                                    link = cached_link
+                                    if cached_ffmpegcmd:
+                                        ffmpegcmd = cached_ffmpegcmd
+                                else:
+                                    try:
+                                        token = stb.getToken(url, mac, proxy)
                                         ids = portals[fallbackPortalId]["ids"][mac]
                                         stb.getProfile(url, mac, token, ids["device_id"], ids["device_id2"], ids["signature"], ids["timestamp"], proxy)
-                                        if "http://localhost/" in cmd or "http:///ch/" in cmd:
-                                            link = stb.getLink(url, mac, token, cmd, proxy)
-                                        else:
-                                            link = cmd.split(" ")[1]
-                                        if link and testStream():
-                                            # Update cooldown timestamp for the fallback channel
-                                            channel_cooldowns[fallback_key] = time.time()
-                                            
-                                            logger.info(f"Fallback found in group {channelGroup} - using channel {fallbackChannelId} from Portal({fallbackPortalId})")
-                                            add_alert("warning", f"Portal: {portals[fallbackPortalId]['name']}", f"Using fallback channel {channelName} (ID: {fallbackChannelId}) from group {channelGroup}")
-                                            if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
-                                                ffmpegcmd = str(getSettings()["ffmpeg command"])
-                                                ffmpegcmd = ffmpegcmd.replace("<url>", link)
-                                                ffmpegcmd = ffmpegcmd.replace("<timeout>", str(int(getSettings()["ffmpeg timeout"]) * 1000000))
-                                                if proxy:
-                                                    ffmpegcmd = ffmpegcmd.replace("<proxy>", proxy)
-                                                else:
-                                                    ffmpegcmd = ffmpegcmd.replace("-http_proxy <proxy>", "")
-                                                ffmpegcmd = " ".join(ffmpegcmd.split()).split()
-                                                return Response(streamData(), mimetype="application/octet-stream")
+                                        name_path = os.path.join(parent_folder, f"{portals[fallbackPortalId]['name']}.json")
+                                        with open(name_path, 'r') as file:
+                                            channels = json.load(file)
+                                    except:
+                                        logger.info(f"Unable to connect to fallback Portal({fallbackPortalId}) using MAC({mac})")
+                                        add_alert("warning", f"Portal: {portals[fallbackPortalId]['name']}", f"Failed to connect to fallback portal using MAC {mac}")
+                                    if channels:
+                                        for c in channels:
+                                            if str(c["id"]) == fallbackChannelId:
+                                                channelName = portals[fallbackPortalId].get("custom channel names", {}).get(fallbackChannelId, c["name"])
+                                                cmd = c["cmd"]
+                                                break
+                                        if cmd:
+                                            ids = portals[fallbackPortalId]["ids"][mac]
+                                            stb.getProfile(url, mac, token, ids["device_id"], ids["device_id2"], ids["signature"], ids["timestamp"], proxy)
+                                            if "http://localhost/" in cmd or "http:///ch/" in cmd:
+                                                link = stb.getLink(url, mac, token, cmd, proxy)
                                             else:
-                                                logger.info("Redirect sent")
-                                                return redirect(link)
+                                                link = cmd.split(" ")[1]
+
+                                if link and testStream():
+                                    # Cache the fallback link
+                                    if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
+                                        ffmpegcmd = str(getSettings()["ffmpeg command"])
+                                        ffmpegcmd = ffmpegcmd.replace("<url>", link)
+                                        ffmpegcmd = ffmpegcmd.replace("<timeout>", str(int(getSettings()["ffmpeg timeout"]) * 1000000))
+                                        if proxy:
+                                            ffmpegcmd = ffmpegcmd.replace("<proxy>", proxy)
+                                        else:
+                                            ffmpegcmd = ffmpegcmd.replace("-http_proxy <proxy>", "")
+                                        ffmpegcmd = " ".join(ffmpegcmd.split()).split()
+                                        link_cache.set(fallback_key, link, ffmpegcmd)
+                                    else:
+                                        link_cache.set(fallback_key, link)
+                                    
+                                    # Update rate limit for fallback
+                                    rate_limiter.update_rate(fallback_key)
+                                    
+                                    logger.info(f"Fallback found in group {channelGroup} - using channel {fallbackChannelId} from Portal({fallbackPortalId})")
+                                    add_alert("warning", f"Portal: {portals[fallbackPortalId]['name']}", f"Using fallback channel {channelName} (ID: {fallbackChannelId}) from group {channelGroup}")
+                                    if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
+                                        return Response(streamData(), mimetype="application/octet-stream")
+                                    else:
+                                        logger.info("Redirect sent")
+                                        return redirect(link)
 
     if freeMac:
         logger.info(f"No working streams found for Portal({portalId}):Channel({channelId})")
@@ -1403,8 +1539,17 @@ def chplay(groupID):
             portal_id = channel.get("portalId")
             channel_id = channel.get("channelId")
             if portal_id and channel_id:
-                # Redirect to the play route for this channel
-                return redirect(f"/play/{portal_id}/{channel_id}")
+                # Check if we have a cached link
+                cache_key = f"{portal_id}:{channel_id}"
+                cached_link, cached_ffmpegcmd = link_cache.get(cache_key)
+                if cached_link:
+                    if getSettings().get("stream method", "ffmpeg") == "ffmpeg":
+                        return redirect(f"/play/{portal_id}/{channel_id}", code=302)
+                    else:
+                        return redirect(cached_link, code=302)
+                
+                # If no cache, redirect to play route
+                return redirect(f"/play/{portal_id}/{channel_id}", code=302)
     
     return make_response(f"No valid channels found in group '{group_name}'", 404)
 
