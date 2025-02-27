@@ -1,6 +1,69 @@
-
-*.pyc
+# Configuration and sensitive data
 config.json
+*.env
+.env
+credentials.json
+secrets.json
+
+# Portal data
+/portals/
+/portals/*.json
+
+# Logs
+*.log
 STB-Proxy.log
-changenotes.txt
-.vscode
+logs/
+*.log.*
+
+# Cache files
+__pycache__/
+*.py[cod]
+*$py.class
+.cache/
+.pytest_cache/
+
+# Alerts
+alerts.json
+
+# Channel groups
+channel_groups.json
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env/
+.venv/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# FFmpeg binary (if stored locally)
+ffmpeg.exe
+ffprobe.exe
+*.dll
+
+# Media files and temporary files
+*.ts
+*.mp4
+*.m3u
+*.m3u8
+temp/
+tmp/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Static files
+/static/logos/
+
+# Backup files
+*.bak
+*~
+*.backup 

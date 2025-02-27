@@ -131,8 +131,8 @@
 <script>
 let selectedGroup = '';
 const createGroupModal = new bootstrap.Modal(document.getElementById('createGroupModal'));
-const channelGroups = {{ channel_groups|tojson|safe }};
-const portals = {{ portals|tojson|safe }};
+let channelGroups = {{ channel_groups|tojson|safe }};
+let portalData = {{ portals|tojson|safe }};
 
 // Initialize Sortable for groups and channels
 let groupsSortable = null;
@@ -305,7 +305,7 @@ function updateChannelsList() {
     const channels = channelGroups[selectedGroup]?.channels || [];
     channels.forEach((channel, index) => {
         const tr = document.createElement('tr');
-        const portalName = channel.portalId in portals ? portals[channel.portalId].name : channel.portalId;
+        const portalName = channel.portalId in portalData ? portalData[channel.portalId].name : channel.portalId;
         
         tr.innerHTML = `
             <td>
@@ -354,7 +354,7 @@ function saveChannelOrder() {
         
         // Find the portal ID based on the portal name
         let portalId = '';
-        for (const [id, portal] of Object.entries(portals)) {
+        for (const [id, portal] of Object.entries(portalData)) {
             if (portal.name === portalName) {
                 portalId = id;
                 break;
@@ -394,10 +394,24 @@ function flash(message, type) {
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    document.querySelector('.container-fluid').insertBefore(alertDiv, document.querySelector('.row'));
     
+    // Insert after navbar
+    const navbar = document.querySelector('nav');
+    if (navbar && navbar.nextSibling) {
+        navbar.parentNode.insertBefore(alertDiv, navbar.nextSibling);
+    } else {
+        // Fallback to container if navbar not found
+        const container = document.querySelector('.container-fluid');
+        if (container) {
+            container.insertBefore(alertDiv, container.firstChild);
+        }
+    }
+    
+    // Auto-remove after 4 seconds
     setTimeout(() => {
-        alertDiv.remove();
+        if (alertDiv && alertDiv.parentNode) {
+            alertDiv.remove();
+        }
     }, 4000);
 }
 
@@ -466,12 +480,42 @@ function deleteSelectedGroup() {
 
 function copyGroupUrl(groupName) {
     const url = window.location.origin + '/chplay/' + encodeURIComponent(groupName);
-    navigator.clipboard.writeText(url).then(() => {
+    
+    // Try using the modern clipboard API first
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url)
+            .then(() => {
+                flash('Group URL copied to clipboard', 'success');
+            })
+            .catch(err => {
+                // Fallback to older execCommand method
+                fallbackCopy(url);
+            });
+    } else {
+        // Fallback for browsers that don't support clipboard API
+        fallbackCopy(url);
+    }
+}
+
+function fallbackCopy(text) {
+    try {
+        // Create temporary input element
+        const tempInput = document.createElement('input');
+        tempInput.style.position = 'absolute';
+        tempInput.style.left = '-9999px';
+        tempInput.value = text;
+        document.body.appendChild(tempInput);
+        
+        // Select and copy
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        
         flash('Group URL copied to clipboard', 'success');
-    }).catch(err => {
+    } catch (err) {
         console.error('Failed to copy URL: ', err);
-        flash('Failed to copy URL', 'danger');
-    });
+        flash('Failed to copy URL. Please copy manually: ' + text, 'danger');
+    }
 }
 
 // Initialize sortables on page load

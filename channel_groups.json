@@ -1,3 +1,114 @@
 {
-
+    "DiemaSport": {
+        "channels": [
+            {
+                "channelId": "1487",
+                "portalId": "bd335f4ee00340269babce99a62bcf00",
+                "channelName": "Diema Sport HD"
+            },
+            {
+                "channelId": "1306",
+                "portalId": "bd335f4ee00340269babce99a62bcf00",
+                "channelName": "Diema Sport"
+            }
+        ],
+        "logo": "",
+        "order": 1
+    },
+    "DiemaSport2": {
+        "channels": [
+            {
+                "channelId": "1478",
+                "portalId": "bd335f4ee00340269babce99a62bcf00",
+                "channelName": "Diema Sport 2 HD"
+            },
+            {
+                "channelId": "1305",
+                "portalId": "bd335f4ee00340269babce99a62bcf00",
+                "channelName": "Diema Sport2"
+            }
+        ],
+        "logo": "",
+        "order": 2
+    },
+    "DiemaSport3": {
+        "channels": [
+            {
+                "channelId": "1678",
+                "portalId": "e4b8df414747485abcb0d3f5df8efe93",
+                "channelName": "Diema Sport 3 HD"
+            },
+            {
+                "channelId": "2815",
+                "portalId": "e4b8df414747485abcb0d3f5df8efe93",
+                "channelName": "Diema Sport 3"
+            }
+        ],
+        "logo": "",
+        "order": 3
+    },
+    "MaxSport1": {
+        "channels": [
+            {
+                "channelId": "1352",
+                "portalId": "bd335f4ee00340269babce99a62bcf00",
+                "channelName": "MAX Sport 1 HD"
+            },
+            {
+                "channelId": "1332",
+                "portalId": "bd335f4ee00340269babce99a62bcf00",
+                "channelName": "MAX Sport 1"
+            }
+        ],
+        "logo": "",
+        "order": 4
+    },
+    "MaxSport2": {
+        "channels": [
+            {
+                "channelId": "1256",
+                "portalId": "bd335f4ee00340269babce99a62bcf00",
+                "channelName": "MAX Sport 2 HD"
+            },
+            {
+                "channelId": "1331",
+                "portalId": "bd335f4ee00340269babce99a62bcf00",
+                "channelName": "MAX Sport 2"
+            }
+        ],
+        "logo": "",
+        "order": 5
+    },
+    "MaxSport3": {
+        "channels": [
+            {
+                "channelId": "1271",
+                "portalId": "bd335f4ee00340269babce99a62bcf00",
+                "channelName": "MAX Sport 3 HD"
+            },
+            {
+                "channelId": "1350",
+                "portalId": "bd335f4ee00340269babce99a62bcf00",
+                "channelName": "MAX Sport 3"
+            }
+        ],
+        "logo": "",
+        "order": 6
+    },
+    "MaxSport4": {
+        "channels": [
+            {
+                "channelId": "1273",
+                "portalId": "e4b8df414747485abcb0d3f5df8efe93",
+                "channelName": "MAX Sport 4 HD"
+            },
+            {
+                "channelId": "1273",
+                "portalId": "bd335f4ee00340269babce99a62bcf00",
+                "channelName": "MAX Sport 4 HD"
+            }
+        ],
+        "logo": "",
+        "order": 7
+    }
 }

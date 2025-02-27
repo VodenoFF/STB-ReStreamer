@@ -22,57 +22,76 @@ def generate_signature(mac_address, token, params):
 def getUrl(url, proxy=None):
     def parseResponse(url, data):
         java = data.text.replace(" ", "").replace("'", "").replace("+", "")
-        # pattern = re.search(r"varpattern.*\/(\(http.*)\/;", java).group(1)
-        pattern = re.search(r"varpattern.*\/(\(http.*)\/;", java).group(1)
-        result = re.search(pattern, url)
-        protocolIndex = re.search(r"this\.portal_protocol.*(\d).*;", java).group(1)
-        ipIndex = re.search(r"this\.portal_ip.*(\d).*;", java).group(1)
-        pathIndex = re.search(r"this\.portal_path.*(\d).*;", java).group(1)
-        protocol = result.group(int(protocolIndex))
-        ip = result.group(int(ipIndex))
-        path = result.group(int(pathIndex))
-        portalPatern = re.search(r"this\.ajax_loader=(.*\.php);", java).group(1)
-        portal = (
-            portalPatern.replace("this.portal_protocol", protocol)
-            .replace("this.portal_ip", ip)
-            .replace("this.portal_path", path)
-        )
-        return portal
+        try:
+            pattern = re.search(r"\s*var\s*pattern.*\/(\(http.*)\/;", data.text).group(1)
+            result = re.search(pattern, url)
+            protocolIndex = re.search(r"this\.portal_protocol.*(\d).*;", java).group(1)
+            ipIndex = re.search(r"this\.portal_ip.*(\d).*;", java).group(1)
+            pathIndex = re.search(r"this\.portal_path.*(\d).*;", java).group(1)
+            protocol = result.group(int(protocolIndex))
+            ip = result.group(int(ipIndex))
+            path = result.group(int(pathIndex))
+            portalPatern = re.search(r"this\.ajax_loader=(.*\.php);", java).group(1)
+            portal = (
+                portalPatern.replace("this.portal_protocol", protocol)
+                .replace("this.portal_ip", ip)
+                .replace("this.portal_path", path)
+            )
+            return portal
+        except:
+            # If parsing fails, check if we're already at a load.php URL
+            if url.endswith('load.php'):
+                return url
+            # Otherwise try to construct the load.php URL
+            base = urlparse(url).scheme + "://" + urlparse(url).netloc
+            return base + "/stalker_portal/server/load.php"
 
-    url = urlparse(url).scheme + "://" + urlparse(url).netloc
+    # If the URL already ends with load.php, return it directly
+    if url.endswith('load.php'):
+        return url
+
+    base_url = urlparse(url).scheme + "://" + urlparse(url).netloc
     urls = [
-        "/stalker_portal/c/xpcom.common.js",
         "/c/xpcom.common.js",
         "/client/xpcom.common.js",
         "/c_/xpcom.common.js",
+        "/stalker_portal/c/xpcom.common.js",
         "/stalker_portal/c_/xpcom.common.js",
     ]
 
-    proxies = {"http": proxy, "https": proxy}
+    proxies = {"http": proxy, "https": proxy} if proxy else None
     headers = {"User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C)"}
 
+    # First try with proxy
     try:
         for i in urls:
             try:
-                response = s.get(url + i, headers=headers, proxies=proxies)
+                response = s.get(base_url + i, headers=headers, proxies=proxies)
+                if response and response.status_code == 200:
+                    result = parseResponse(base_url + i, response)
+                    if result:
+                        return result
             except:
-                response = None
-            if response:
-                return parseResponse(url + i, response)
+                continue
     except:
         pass
 
-    # sometimes these pages dont like proxies!
+    # Try without proxy
     try:
         for i in urls:
             try:
-                response = s.get(url + i, headers=headers)
+                response = s.get(base_url + i, headers=headers)
+                if response and response.status_code == 200:
+                    result = parseResponse(base_url + i, response)
+                    if result:
+                        return result
             except:
-                response = None
-            if response:
-                return parseResponse(url + i, response)
+                continue
     except:
         pass
+
+    # If all else fails, try to construct the load.php URL
+    return base_url + "/stalker_portal/server/load.php"
 
 
 def getToken(url, mac, proxy=None):

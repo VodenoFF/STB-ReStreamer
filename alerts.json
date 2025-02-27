@@ -1,3 +1,18 @@
 [
-
+    {
+        "timestamp": "2025-02-24 18:21:58",
+        "type": "error",
+        "source": "Portal: nqkwo2",
+        "message": "Stream error for channel Box Office1:  (ID: 915)",
+        "status": "resolved",
+        "resolved_at": "2025-02-24 18:23:29"
+    },
+    {
+        "timestamp": "2025-02-24 18:24:33",
+        "type": "error",
+        "source": "System",
+        "message": "FFmpeg not found. Please install FFmpeg and make sure it's in the system PATH",
+        "status": "resolved",
+        "resolved_at": "2025-02-24 18:30:38"
+    }
 ]
