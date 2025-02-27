@@ -4,7 +4,7 @@ config.json
 .env
 credentials.json
 secrets.json
-
+.cursorrules
 # Portal data
 /portals/
 /portals/*.json
