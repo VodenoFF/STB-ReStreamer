@@ -1,0 +1,125 @@
+{% extends "layout.html" %}
+
+{% block title %}HDHomeRun Settings - STB-ReStreamer{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-3 mb-4">
+        <div class="list-group">
+            <a href="{{ url_for('settings.general_settings') }}" class="list-group-item list-group-item-action">
+                <i class="fas fa-sliders-h me-2"></i>General Settings
+            </a>
+            <a href="{{ url_for('settings.hdhr_settings') }}" class="list-group-item list-group-item-action active">
+                <i class="fas fa-broadcast-tower me-2"></i>HDHomeRun Settings
+            </a>
+        </div>
+    </div>
+    
+    <div class="col-lg-9">
+        <div class="card">
+            <div class="card-header bg-transparent">
+                <h5 class="mb-0">HDHomeRun Emulation Settings</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Note:</strong> These settings configure the HDHomeRun emulation for compatibility with applications like Plex or Channels DVR.
+                </div>
+                
+                <form method="POST" action="{{ url_for('settings.hdhr_settings') }}">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="hdhr_device_id" class="form-label">Device ID</label>
+                            <input type="text" class="form-control" id="hdhr_device_id" name="hdhr_device_id" 
+                                   value="{{ settings.get('hdhr_device_id', '12345678') }}" 
+                                   pattern="[0-9a-fA-F]{8}" maxlength="8" required>
+                            <div class="form-text">8-character hexadecimal device ID</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="hdhr_tuner_count" class="form-label">Tuner Count</label>
+                            <input type="number" class="form-control" id="hdhr_tuner_count" name="hdhr_tuner_count" 
+                                   value="{{ settings.get('hdhr_tuner_count', 4) }}" min="1" max="16" required>
+                            <div class="form-text">Number of tuners to emulate</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="hdhr_filter_groups" name="hdhr_filter_groups" 
+                                   {% if settings.get('hdhr_filter_groups') %}checked{% endif %}>
+                            <label class="form-check-label" for="hdhr_filter_groups">Filter Channels by Groups</label>
+                        </div>
+                        <div class="form-text">Only include channels from selected groups in HDHomeRun lineup</div>
+                    </div>
+                    
+                    <div class="mb-3" id="groupsSelection" {% if not settings.get('hdhr_filter_groups') %}style="display: none;"{% endif %}>
+                        <label class="form-label">Select Channel Groups</label>
+                        <div class="card">
+                            <div class="card-body">
+                                {% if all_groups|length > 0 %}
+                                    {% for group_name, channels in all_groups.items() %}
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="group-{{ loop.index }}" 
+                                               name="hdhr_groups" value="{{ group_name }}"
+                                               {% if group_name in settings.get('hdhr_groups', []) %}checked{% endif %}>
+                                        <label class="form-check-label" for="group-{{ loop.index }}">
+                                            {{ group_name }} <span class="text-muted">({{ channels|length }} channels)</span>
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="alert alert-warning mb-0">
+                                        <i class="fas fa-exclamation-triangle me-2"></i>No channel groups found. 
+                                        <a href="{{ url_for('groups.add_group') }}">Create a channel group</a> first.
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">HDHomeRun Device URLs</label>
+                        <div class="alert alert-secondary">
+                            <p class="mb-1"><strong>Discovery URL:</strong> <code>http://your-ip:{{ settings.get('port', 8001) }}/discover.json</code></p>
+                            <p class="mb-1"><strong>Lineup URL:</strong> <code>http://your-ip:{{ settings.get('port', 8001) }}/lineup.json</code></p>
+                            <p class="mb-0"><strong>Device XML:</strong> <code>http://your-ip:{{ settings.get('port', 8001) }}/device.xml</code></p>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Save HDHomeRun Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // Toggle groups selection based on filter checkbox
+        $('#hdhr_filter_groups').change(function() {
+            if ($(this).is(':checked')) {
+                $('#groupsSelection').slideDown();
+            } else {
+                $('#groupsSelection').slideUp();
+            }
+        });
+        
+        // Format device ID as hexadecimal
+        $('#hdhr_device_id').on('input', function() {
+            let value = $(this).val().replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+            if (value.length > 8) {
+                value = value.substring(0, 8);
+            }
+            $(this).val(value);
+        });
+    });
+</script>
+{% endblock %}

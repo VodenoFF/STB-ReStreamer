@@ -1,0 +1,56 @@
+{
+  "test_stalker": {
+    "id": "test_stalker",
+    "name": "Test Stalker",
+    "type": "stalker",
+    "url": "http://your-stalker-portal.com",
+    "username": "user123",
+    "password": "pass123",
+    "macs": {
+      "00:1A:79:00:00:01": {
+        "serial": "012345",
+        "device_id": "012345",
+        "device_id2": "012345"
+      }
+    },
+    "enabled": true,
+    "order": 1,
+    "icon": "fa-television",
+    "description": "Test Stalker portal with credentials",
+    "created_at": 1743169095
+  },
+  "test_ministra": {
+    "id": "test_ministra",
+    "name": "Test Ministra",
+    "type": "ministra", 
+    "url": "http://your-ministra-portal.com",
+    "username": "user456",
+    "password": "pass456", 
+    "macs": {
+      "00:1A:79:00:00:02": {
+        "serial": "678901",
+        "device_id": "678901",
+        "device_id2": "678901"
+      }
+    },
+    "enabled": true,
+    "order": 2,
+    "icon": "fa-television",
+    "description": "Test Ministra portal with credentials",
+    "created_at": 1743169095
+  },
+  "test_xtream": {
+    "id": "test_xtream",
+    "name": "Test Xtream",
+    "type": "xtream",
+    "url": "http://your-xtream-portal.com",
+    "username": "user789",
+    "password": "pass789",
+    "macs": {},
+    "enabled": true,
+    "order": 3,
+    "icon": "fa-television",
+    "description": "Test Xtream portal with credentials",
+    "created_at": 1743169095
+  }
+} 

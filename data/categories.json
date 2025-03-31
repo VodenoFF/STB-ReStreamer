@@ -1,0 +1,20 @@
+{
+  "default": {
+    "id": "default",
+    "name": "Default",
+    "description": "Default category for all channels",
+    "icon": "fa-list",
+    "order": 0,
+    "system": true,
+    "created_at": 1743169095
+  },
+  "favorites": {
+    "id": "favorites",
+    "name": "Favorites",
+    "description": "Favorite channels",
+    "icon": "fa-star",
+    "order": 1,
+    "system": true,
+    "created_at": 1743169095
+  }
+}

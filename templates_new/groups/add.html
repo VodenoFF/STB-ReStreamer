@@ -1,0 +1,144 @@
+{% extends "layout.html" %}
+
+{% block title %}Add Channel Group - STB-ReStreamer{% endblock %}
+
+{% block page_actions %}
+<div>
+    <a href="{{ url_for('groups.list_groups') }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to Groups
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-transparent">
+        <h5 class="mb-0">Add Channel Group</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('groups.add_group') }}">
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <label for="name" class="form-label">Group Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="name" name="name" 
+                           value="{{ form_data.get('name', '') }}" required>
+                    <div class="form-text">A descriptive name for this channel group</div>
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <label class="form-label">Select Channels</label>
+                
+                {% if channels|length > 0 %}
+                <div class="mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control" id="channelSearch" placeholder="Search channels...">
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="selectAllChannels">
+                                <label class="form-check-label" for="selectAllChannels">
+                                    <strong>Select All</strong>
+                                </label>
+                            </div>
+                            <span class="badge bg-primary" id="selectedCount">0 selected</span>
+                        </div>
+                    </div>
+                    <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                        <div class="row">
+                            {% for channel in channels %}
+                            <div class="col-md-6 channel-item">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input channel-checkbox" type="checkbox" 
+                                           id="channel-{{ channel.id }}" name="channels" value="{{ channel.id }}"
+                                           {% if channel.id in form_data.getlist('channels', []) %}checked{% endif %}>
+                                    <label class="form-check-label d-flex align-items-center" for="channel-{{ channel.id }}">
+                                        <span class="channel-number badge bg-secondary me-2">{{ channel.number }}</span>
+                                        <span class="channel-name">{{ channel.name }}</span>
+                                        <span class="ms-auto text-muted small">{{ channel.portal_name }}</span>
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>No channels available. Please add and enable a portal first.
+                </div>
+                {% endif %}
+            </div>
+            
+            <hr>
+            
+            <div class="d-flex justify-content-between">
+                <a href="{{ url_for('groups.list_groups') }}" class="btn btn-outline-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary" {% if not channels %}disabled{% endif %}>
+                    <i class="fas fa-save me-2"></i>Save Group
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // Channel search
+        $('#channelSearch').on('input', function() {
+            const searchText = $(this).val().toLowerCase();
+            
+            $('.channel-item').each(function() {
+                const channelName = $(this).find('.channel-name').text().toLowerCase();
+                const channelNumber = $(this).find('.channel-number').text().toLowerCase();
+                const portalName = $(this).find('.text-muted').text().toLowerCase();
+                
+                if (channelName.includes(searchText) || 
+                    channelNumber.includes(searchText) || 
+                    portalName.includes(searchText)) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
+        });
+        
+        // Select all channels
+        $('#selectAllChannels').change(function() {
+            const isChecked = $(this).prop('checked');
+            $('.channel-checkbox:visible').prop('checked', isChecked);
+            updateSelectedCount();
+        });
+        
+        // Update selected count when individual checkboxes change
+        $('.channel-checkbox').change(function() {
+            updateSelectedCount();
+            
+            // Update "select all" checkbox
+            const allVisible = $('.channel-checkbox:visible').length;
+            const allCheckedVisible = $('.channel-checkbox:visible:checked').length;
+            
+            if (allVisible === allCheckedVisible) {
+                $('#selectAllChannels').prop('checked', true);
+            } else {
+                $('#selectAllChannels').prop('checked', false);
+            }
+        });
+        
+        // Initial count update
+        updateSelectedCount();
+        
+        function updateSelectedCount() {
+            const selectedCount = $('.channel-checkbox:checked').length;
+            $('#selectedCount').text(selectedCount + ' selected');
+        }
+    });
+</script>
+{% endblock %}

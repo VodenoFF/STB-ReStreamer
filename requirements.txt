@@ -1,0 +1,12 @@
+Flask==2.3.3
+Werkzeug==2.3.7
+waitress==2.1.2
+requests==2.31.0
+flask-socketio==5.3.6
+python-socketio==5.10.0
+python-engineio==4.8.0
+cryptography==41.0.4
+PyJWT==2.8.0
+m3u8==3.6.0
+xmltodict==0.13.0
+defusedxml==0.7.1 

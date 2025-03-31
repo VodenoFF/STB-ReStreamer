@@ -1,0 +1,121 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Real-time Stream Status</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>This page provides real-time monitoring of streams via WebSockets.
+                </div>
+                
+                <!-- Stream status container -->
+                <div id="stream-status-container">
+                    <div class="d-flex justify-content-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <p class="text-center text-muted mt-2">Waiting for status data...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+<script>
+    $(document).ready(function() {
+        // Connect to WebSocket server
+        const socket = io('/stream_status');
+        
+        // On connection, request initial status
+        socket.on('connect', function() {
+            console.log('Connected to WebSocket');
+            socket.emit('request_status');
+        });
+        
+        // Handle stream status updates
+        socket.on('stream_status_update', function(data) {
+            console.log('Received stream status update:', data);
+            updateStreamStatus(data);
+        });
+        
+        // Handle portal status updates
+        socket.on('portal_status_update', function(data) {
+            console.log('Received portal status update:', data);
+            updatePortalStatus(data);
+        });
+        
+        // Handle disconnect
+        socket.on('disconnect', function() {
+            console.log('Disconnected from WebSocket');
+        });
+        
+        // Update stream status function
+        function updateStreamStatus(data) {
+            // In a real implementation, this would update the UI with stream status
+            // For now, just show the latest update time
+            const timestamp = new Date().toLocaleTimeString();
+            
+            if (data.active_streams) {
+                // If the data contains all active streams (initial load)
+                const count = data.count || 0;
+                
+                $('#stream-status-container').html(`
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>Status updated at ${timestamp}
+                    </div>
+                    <div class="mb-3">
+                        <h6>Active Streams: <span class="badge bg-primary">${count}</span></h6>
+                    </div>
+                    <div id="active-streams-list" class="list-group">
+                        ${count > 0 ? '' : '<p class="text-muted">No active streams</p>'}
+                    </div>
+                `);
+                
+                // Add each stream to the list
+                if (data.active_streams && count > 0) {
+                    for (const [streamId, stream] of Object.entries(data.active_streams)) {
+                        $('#active-streams-list').append(`
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span><strong>${stream.channel_name || 'Unknown'}</strong> (${stream.portal_name || 'Unknown Portal'})</span>
+                                    <span class="badge bg-success">Active</span>
+                                </div>
+                                <div class="small text-muted">
+                                    Client: ${stream.client_ip || 'Unknown'}, 
+                                    Duration: ${formatDuration(stream.uptime || 0)}
+                                </div>
+                            </div>
+                        `);
+                    }
+                }
+            } else if (data.stream_id) {
+                // If the data contains a single stream update
+                // Handle individual stream updates here
+            }
+        }
+        
+        // Update portal status function
+        function updatePortalStatus(data) {
+            // In a real implementation, this would update the UI with portal status
+            console.log('Portal status updated:', data);
+        }
+        
+        // Format duration in seconds to human readable format
+        function formatDuration(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+    });
+</script>
+{% endblock %} 

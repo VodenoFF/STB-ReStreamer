@@ -1,0 +1,28 @@
+{
+    "65896c82-5d7f-48fe-bf80-6805b20f97ea": {
+        "id": "65896c82-5d7f-48fe-bf80-6805b20f97ea",
+        "name": "homeiptv",
+        "url": "http://stb.homeiptv.org/stalker_portal/server/load.php",
+        "type": "stalker",
+        "mac": "00:1A:79:00:92:A2",
+        "username": "REPLACE_WITH_YOUR_USERNAME",
+        "password": "REPLACE_WITH_YOUR_PASSWORD",
+        "proxy": null,
+        "enabled": true,
+        "max_connections": 1
+    },
+    "51c32496-ce30-422d-a0e6-3474f0467fb8": {
+        "id": "51c32496-ce30-422d-a0e6-3474f0467fb8",
+        "name": "test",
+        "url": "http://152.53.86.6/c",
+        "type": "xtream",
+        "mac": "00:1A:79:00:00:00",
+        "username": "",
+        "password": "",
+        "proxy": "None",
+        "enabled": true,
+        "max_connections": 10,
+        "use_catchup": false,
+        "use_dvr": false
+    }
+}

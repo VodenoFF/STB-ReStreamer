@@ -1,0 +1,183 @@
+{% extends "layout.html" %}
+
+{% block title %}Edit Portal - STB-ReStreamer{% endblock %}
+
+{% block page_actions %}
+<div>
+    <a href="{{ url_for('portals.list_portals') }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to Portals
+    </a>
+    <button type="button" class="btn btn-danger ms-2" data-bs-toggle="modal" data-bs-target="#deletePortalModal">
+        <i class="fas fa-trash-alt me-2"></i>Delete Portal
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-transparent">
+        <h5 class="mb-0">Edit IPTV Portal</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('portals.edit_portal', portal_id=portal.id) }}" id="portal-form">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="name" class="form-label">Portal Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="name" name="name" 
+                           value="{{ portal.name }}" required>
+                    <div class="form-text">A descriptive name for this portal</div>
+                </div>
+                <div class="col-md-6">
+                    <label for="type" class="form-label">Portal Type <span class="text-danger">*</span></label>
+                    <select class="form-select" id="portal-type" name="type" required>
+                        <option value="stalker" {% if portal.get('type', 'stalker') == 'stalker' %}selected{% endif %}>Stalker Portal</option>
+                        <option value="xtream" {% if portal.get('type') == 'xtream' %}selected{% endif %}>Xtream Codes</option>
+                        <option value="m3u" {% if portal.get('type') == 'm3u' %}selected{% endif %}>M3U Playlist</option>
+                        <option value="ministra" {% if portal.get('type') == 'ministra' %}selected{% endif %}>Ministra Portal</option>
+                        <option value="xcupdates" {% if portal.get('type') == 'xcupdates' %}selected{% endif %}>XC Updates</option>
+                    </select>
+                    <div class="form-text">The portal implementation type</div>
+                </div>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-md-12">
+                    <label for="url" class="form-label">Portal URL <span class="text-danger">*</span></label>
+                    <input type="url" class="form-control" id="url" name="url" 
+                           value="{{ portal.url }}" placeholder="http://example.com" required>
+                    <div class="form-text">The base URL for the portal or playlist URL for M3U</div>
+                </div>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="mac" class="form-label">MAC Address</label>
+                    <input type="text" class="form-control" id="mac" name="mac" 
+                           value="{{ portal.mac }}" placeholder="00:1A:79:XX:XX:XX">
+                    <div class="form-text">MAC address for portal authentication</div>
+                </div>
+                <div class="col-md-6">
+                    <label for="max_connections" class="form-label">Max Connections</label>
+                    <input type="number" class="form-control" id="max_connections" name="max_connections"
+                           value="{{ portal.max_connections|default(1) }}" min="1" max="10">
+                    <div class="form-text">Maximum simultaneous connections to this MAC</div>
+                </div>
+            </div>
+            
+            <!-- Authentication fields (visible for all except M3U) -->
+            <div class="row mb-3 field-stalker field-xtream field-ministra field-xcupdates">
+                <div class="col-md-6">
+                    <label for="username" class="form-label">Username</label>
+                    <input type="text" class="form-control" id="username" name="username" 
+                           value="{{ portal.username|default('') }}">
+                    <div class="form-text">Portal username (if required)</div>
+                </div>
+                <div class="col-md-6">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" class="form-control" id="password" name="password" 
+                           value="{{ portal.password|default('') }}">
+                    <div class="form-text">Portal password (if required)</div>
+                </div>
+            </div>
+            
+            <!-- M3U Specific fields -->
+            <div class="row mb-3 field-m3u d-none">
+                <div class="col-md-6">
+                    <label for="epg_url" class="form-label">EPG URL</label>
+                    <input type="url" class="form-control" id="epg_url" name="epg_url" 
+                           value="{{ portal.epg_url|default('') }}" placeholder="http://example.com/epg.xml">
+                    <div class="form-text">URL to XMLTV EPG data (optional)</div>
+                </div>
+                <div class="col-md-6">
+                    <label for="refresh_interval" class="form-label">Refresh Interval (hours)</label>
+                    <input type="number" class="form-control" id="refresh_interval" name="refresh_interval"
+                           value="{{ portal.refresh_interval|default(24) }}" min="1" max="168">
+                    <div class="form-text">How often to refresh the playlist (hours)</div>
+                </div>
+            </div>
+            
+            <!-- XC Updates specific fields -->
+            <div class="row mb-3 field-xcupdates d-none">
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="use_catchup" name="use_catchup" 
+                               {% if portal.use_catchup %}checked{% endif %}>
+                        <label class="form-check-label" for="use_catchup">Enable Catchup</label>
+                    </div>
+                    <div class="form-text">Enable TV catchup/timeshift if supported by provider</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="use_dvr" name="use_dvr" 
+                               {% if portal.use_dvr %}checked{% endif %}>
+                        <label class="form-check-label" for="use_dvr">Enable DVR</label>
+                    </div>
+                    <div class="form-text">Enable DVR functionality if supported by provider</div>
+                </div>
+            </div>
+            
+            <!-- Common fields for all portal types -->
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="proxy" class="form-label">HTTP Proxy</label>
+                    <input type="text" class="form-control" id="proxy" name="proxy" 
+                           value="{{ portal.proxy|default('') }}" placeholder="http://user:pass@proxy.example.com:8080">
+                    <div class="form-text">HTTP proxy for portal requests (optional)</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch pt-4">
+                        <input class="form-check-input" type="checkbox" id="enabled" name="enabled" 
+                               {% if portal.enabled %}checked{% endif %}>
+                        <label class="form-check-label" for="enabled">Enable Portal</label>
+                    </div>
+                    <div class="form-text">Portal will be active when enabled</div>
+                </div>
+            </div>
+
+            <hr>
+            
+            <div class="d-flex justify-content-between">
+                <a href="{{ url_for('portals.list_portals') }}" class="btn btn-outline-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-2"></i>Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Portal Confirmation Modal -->
+<div class="modal fade" id="deletePortalModal" tabindex="-1" aria-labelledby="deletePortalModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deletePortalModalLabel">Delete Portal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the portal <strong>"{{ portal.name }}"</strong>?</p>
+                <p class="text-danger">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="{{ url_for('portals.delete_portal', portal_id=portal.id) }}">
+                    <button type="submit" class="btn btn-danger">Delete Portal</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Include our portal JS functions -->
+<script src="{{ url_for('static', filename='js/portals.js') }}"></script>
+<script>
+    $(document).ready(function() {
+        // Format MAC address as it's typed using the portals.js function
+        $('#mac').on('input', function() {
+            formatMacAddress(this);
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,352 @@
+[
+  {
+    "id": "ch1",
+    "name": "Lifestyle Channel 1",
+    "number": 1,
+    "type": "Lifestyle",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH1"
+  },
+  {
+    "id": "ch2",
+    "name": "Entertainment Channel 2",
+    "number": 2,
+    "type": "Entertainment",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH2"
+  },
+  {
+    "id": "ch3",
+    "name": "Documentaries Channel 3",
+    "number": 3,
+    "type": "Documentaries",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH3"
+  },
+  {
+    "id": "ch4",
+    "name": "Movies Channel 4",
+    "number": 4,
+    "type": "Movies",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH4"
+  },
+  {
+    "id": "ch5",
+    "name": "Documentaries Channel 5",
+    "number": 5,
+    "type": "Documentaries",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH5"
+  },
+  {
+    "id": "ch6",
+    "name": "Entertainment Channel 6",
+    "number": 6,
+    "type": "Entertainment",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH6"
+  },
+  {
+    "id": "ch7",
+    "name": "Documentaries Channel 7",
+    "number": 7,
+    "type": "Documentaries",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH7"
+  },
+  {
+    "id": "ch8",
+    "name": "Documentaries Channel 8",
+    "number": 8,
+    "type": "Documentaries",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH8"
+  },
+  {
+    "id": "ch9",
+    "name": "Kids Channel 9",
+    "number": 9,
+    "type": "Kids",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH9"
+  },
+  {
+    "id": "ch10",
+    "name": "Movies Channel 10",
+    "number": 10,
+    "type": "Movies",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH10"
+  },
+  {
+    "id": "ch11",
+    "name": "Entertainment Channel 11",
+    "number": 11,
+    "type": "Entertainment",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH11"
+  },
+  {
+    "id": "ch12",
+    "name": "Movies Channel 12",
+    "number": 12,
+    "type": "Movies",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH12"
+  },
+  {
+    "id": "ch13",
+    "name": "Entertainment Channel 13",
+    "number": 13,
+    "type": "Entertainment",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH13"
+  },
+  {
+    "id": "ch14",
+    "name": "Documentaries Channel 14",
+    "number": 14,
+    "type": "Documentaries",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH14"
+  },
+  {
+    "id": "ch15",
+    "name": "Kids Channel 15",
+    "number": 15,
+    "type": "Kids",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH15"
+  },
+  {
+    "id": "ch16",
+    "name": "Entertainment Channel 16",
+    "number": 16,
+    "type": "Entertainment",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH16"
+  },
+  {
+    "id": "ch17",
+    "name": "Documentaries Channel 17",
+    "number": 17,
+    "type": "Documentaries",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH17"
+  },
+  {
+    "id": "ch18",
+    "name": "News Channel 18",
+    "number": 18,
+    "type": "News",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH18"
+  },
+  {
+    "id": "ch19",
+    "name": "Documentaries Channel 19",
+    "number": 19,
+    "type": "Documentaries",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH19"
+  },
+  {
+    "id": "ch20",
+    "name": "Sports Channel 20",
+    "number": 20,
+    "type": "Sports",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH20"
+  },
+  {
+    "id": "ch21",
+    "name": "Entertainment Channel 21",
+    "number": 21,
+    "type": "Entertainment",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH21"
+  },
+  {
+    "id": "ch22",
+    "name": "Documentaries Channel 22",
+    "number": 22,
+    "type": "Documentaries",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH22"
+  },
+  {
+    "id": "ch23",
+    "name": "Music Channel 23",
+    "number": 23,
+    "type": "Music",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH23"
+  },
+  {
+    "id": "ch24",
+    "name": "Entertainment Channel 24",
+    "number": 24,
+    "type": "Entertainment",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH24"
+  },
+  {
+    "id": "ch25",
+    "name": "Sports Channel 25",
+    "number": 25,
+    "type": "Sports",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH25"
+  },
+  {
+    "id": "ch26",
+    "name": "Movies Channel 26",
+    "number": 26,
+    "type": "Movies",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH26"
+  },
+  {
+    "id": "ch27",
+    "name": "Sports Channel 27",
+    "number": 27,
+    "type": "Sports",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH27"
+  },
+  {
+    "id": "ch28",
+    "name": "Lifestyle Channel 28",
+    "number": 28,
+    "type": "Lifestyle",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH28"
+  },
+  {
+    "id": "ch29",
+    "name": "Music Channel 29",
+    "number": 29,
+    "type": "Music",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH29"
+  },
+  {
+    "id": "ch30",
+    "name": "News Channel 30",
+    "number": 30,
+    "type": "News",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH30"
+  },
+  {
+    "id": "ch31",
+    "name": "Kids Channel 31",
+    "number": 31,
+    "type": "Kids",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH31"
+  },
+  {
+    "id": "ch32",
+    "name": "Entertainment Channel 32",
+    "number": 32,
+    "type": "Entertainment",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH32"
+  },
+  {
+    "id": "ch33",
+    "name": "Kids Channel 33",
+    "number": 33,
+    "type": "Kids",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH33"
+  },
+  {
+    "id": "ch34",
+    "name": "Documentaries Channel 34",
+    "number": 34,
+    "type": "Documentaries",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH34"
+  },
+  {
+    "id": "ch35",
+    "name": "Sports Channel 35",
+    "number": 35,
+    "type": "Sports",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH35"
+  },
+  {
+    "id": "ch36",
+    "name": "Kids Channel 36",
+    "number": 36,
+    "type": "Kids",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH36"
+  },
+  {
+    "id": "ch37",
+    "name": "Documentaries Channel 37",
+    "number": 37,
+    "type": "Documentaries",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH37"
+  },
+  {
+    "id": "ch38",
+    "name": "Documentaries Channel 38",
+    "number": 38,
+    "type": "Documentaries",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH38"
+  },
+  {
+    "id": "ch39",
+    "name": "Lifestyle Channel 39",
+    "number": 39,
+    "type": "Lifestyle",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH39"
+  },
+  {
+    "id": "ch40",
+    "name": "Lifestyle Channel 40",
+    "number": 40,
+    "type": "Lifestyle",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH40"
+  },
+  {
+    "id": "ch41",
+    "name": "Lifestyle Channel 41",
+    "number": 41,
+    "type": "Lifestyle",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH41"
+  },
+  {
+    "id": "ch42",
+    "name": "Documentaries Channel 42",
+    "number": 42,
+    "type": "Documentaries",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH42"
+  },
+  {
+    "id": "ch43",
+    "name": "Movies Channel 43",
+    "number": 43,
+    "type": "Movies",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH43"
+  },
+  {
+    "id": "ch44",
+    "name": "Movies Channel 44",
+    "number": 44,
+    "type": "Movies",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH44"
+  },
+  {
+    "id": "ch45",
+    "name": "Kids Channel 45",
+    "number": 45,
+    "type": "Kids",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH45"
+  },
+  {
+    "id": "ch46",
+    "name": "Documentaries Channel 46",
+    "number": 46,
+    "type": "Documentaries",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH46"
+  },
+  {
+    "id": "ch47",
+    "name": "Sports Channel 47",
+    "number": 47,
+    "type": "Sports",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH47"
+  },
+  {
+    "id": "ch48",
+    "name": "Lifestyle Channel 48",
+    "number": 48,
+    "type": "Lifestyle",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH48"
+  },
+  {
+    "id": "ch49",
+    "name": "Kids Channel 49",
+    "number": 49,
+    "type": "Kids",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH49"
+  },
+  {
+    "id": "ch50",
+    "name": "Lifestyle Channel 50",
+    "number": 50,
+    "type": "Lifestyle",
+    "logo": "https://via.placeholder.com/100x100.png?text=CH50"
+  }
+]

@@ -1,0 +1,392 @@
+{% extends "layout.html" %}
+
+{% block title %}Stream Status - STB-ReStreamer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stream-card {
+        margin-bottom: 15px;
+        transition: all 0.3s ease;
+    }
+    .stream-card.new {
+        animation: highlight 2s ease;
+    }
+    
+    @keyframes highlight {
+        0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.5); }
+        50% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+    }
+    
+    .status-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+    }
+    
+    .status-active {
+        background-color: #28a745;
+    }
+    
+    .status-warning {
+        background-color: #ffc107;
+    }
+    
+    .status-stopped {
+        background-color: #dc3545;
+    }
+    
+    .stream-stats {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+    
+    .stream-stats h4 {
+        margin-top: 0;
+    }
+    
+    .stream-stats .stat-value {
+        font-size: 24px;
+        font-weight: 500;
+    }
+    
+    .stream-stats .stat-label {
+        color: #6c757d;
+    }
+    
+    .no-streams {
+        padding: 30px;
+        text-align: center;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+    }
+    
+    .no-streams i {
+        font-size: 48px;
+        color: #6c757d;
+        margin-bottom: 15px;
+    }
+    
+    #streamList {
+        min-height: 100px;
+    }
+    
+    .stream-card .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .stream-duration {
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+    
+    .stream-details {
+        margin-bottom: 0;
+    }
+    
+    .stream-details dt {
+        font-weight: 500;
+    }
+    
+    .portal-badge {
+        padding: 5px 8px;
+        border-radius: 3px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        background-color: #e9ecef;
+        color: #495057;
+        display: inline-block;
+        margin-bottom: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block page_title %}Stream Status{% endblock %}
+
+{% block page_actions %}
+<div>
+    <button id="refreshButton" class="btn btn-outline-secondary">
+        <i class="fas fa-sync-alt"></i> Refresh
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="stream-stats">
+            <h4>Active Streams</h4>
+            <div class="stat-value" id="activeStreamCount">0</div>
+            <div class="stat-label">Total streams currently active</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stream-stats">
+            <h4>Stream Status</h4>
+            <div id="connectionStatus">
+                <span class="status-indicator status-stopped"></span> Disconnected
+            </div>
+            <div class="stat-label">WebSocket connection status</div>
+            <div class="mt-2">
+                <span id="lastUpdateTime">Never updated</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stream-stats">
+            <h4>Auto-Refresh</h4>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked>
+                <label class="form-check-label" for="autoRefreshToggle">
+                    Auto-refresh every 2 seconds
+                </label>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Active Streams</h5>
+            </div>
+            <div class="card-body">
+                <div id="streamList">
+                    <div class="no-streams">
+                        <i class="fas fa-tv"></i>
+                        <h4>No Active Streams</h4>
+                        <p>There are no active streams at the moment.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // DOM elements
+        const streamList = document.getElementById('streamList');
+        const activeStreamCount = document.getElementById('activeStreamCount');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const lastUpdateTime = document.getElementById('lastUpdateTime');
+        const autoRefreshToggle = document.getElementById('autoRefreshToggle');
+        const refreshButton = document.getElementById('refreshButton');
+        
+        // Track known streams to handle additions/removals
+        let knownStreams = {};
+        
+        // Connect to WebSocket server
+        const socket = io('/stream_status', {
+            path: '/socket.io'
+        });
+        
+        // Connect event
+        socket.on('connect', function() {
+            connectionStatus.innerHTML = '<span class="status-indicator status-active"></span> Connected';
+            console.log('Connected to stream status updates');
+        });
+        
+        // Disconnect event
+        socket.on('disconnect', function() {
+            connectionStatus.innerHTML = '<span class="status-indicator status-stopped"></span> Disconnected';
+            console.log('Disconnected from stream status updates');
+        });
+        
+        // Error event
+        socket.on('connect_error', function(error) {
+            connectionStatus.innerHTML = '<span class="status-indicator status-warning"></span> Connection Error';
+            console.error('WebSocket connection error:', error);
+        });
+        
+        // Receive stream status updates
+        socket.on('stream_status_update', function(data) {
+            console.log('Received stream status update:', data);
+            
+            // Only process if auto-refresh is enabled
+            if (autoRefreshToggle.checked) {
+                updateStreamDisplay(data.active_streams);
+                
+                // Update count
+                activeStreamCount.textContent = data.count;
+                
+                // Update last update time
+                const updateTime = new Date();
+                lastUpdateTime.textContent = 'Last update: ' + updateTime.toLocaleTimeString();
+            }
+        });
+        
+        // Update stream display with new data
+        function updateStreamDisplay(streams) {
+            // Create a new set of IDs for comparison
+            const newStreamIds = new Set(Object.keys(streams));
+            const currentStreamIds = new Set(Object.keys(knownStreams));
+            
+            // Calculate differences
+            const removedStreamIds = [...currentStreamIds].filter(id => !newStreamIds.has(id));
+            const addedStreamIds = [...newStreamIds].filter(id => !currentStreamIds.has(id));
+            const keptStreamIds = [...newStreamIds].filter(id => currentStreamIds.has(id));
+            
+            // Remove deleted streams
+            removedStreamIds.forEach(id => {
+                const element = document.getElementById(`stream-${id}`);
+                if (element) {
+                    element.remove();
+                    delete knownStreams[id];
+                }
+            });
+            
+            // Add new streams
+            addedStreamIds.forEach(id => {
+                const streamData = streams[id];
+                const newElement = createStreamElement(id, streamData);
+                streamList.appendChild(newElement);
+                knownStreams[id] = streamData;
+                
+                // Add highlight animation class
+                newElement.classList.add('new');
+                setTimeout(() => {
+                    newElement.classList.remove('new');
+                }, 2000);
+            });
+            
+            // Update existing streams
+            keptStreamIds.forEach(id => {
+                const streamData = streams[id];
+                updateStreamElement(id, streamData);
+                knownStreams[id] = streamData;
+            });
+            
+            // Show/hide empty message
+            const noStreamsElement = document.querySelector('.no-streams');
+            if (newStreamIds.size === 0) {
+                if (!noStreamsElement) {
+                    streamList.innerHTML = `
+                        <div class="no-streams">
+                            <i class="fas fa-tv"></i>
+                            <h4>No Active Streams</h4>
+                            <p>There are no active streams at the moment.</p>
+                        </div>
+                    `;
+                }
+            } else {
+                if (noStreamsElement) {
+                    noStreamsElement.remove();
+                }
+            }
+        }
+        
+        // Create HTML for a single stream card
+        function createStreamElement(id, data) {
+            // Calculate duration
+            const startTime = data.start_time * 1000; // Convert to milliseconds
+            const now = Date.now();
+            const durationMs = now - startTime;
+            const durationMinutes = Math.floor(durationMs / (1000 * 60));
+            const durationSeconds = Math.floor((durationMs % (1000 * 60)) / 1000);
+            const durationText = `${durationMinutes}m ${durationSeconds}s`;
+            
+            // Create element
+            const div = document.createElement('div');
+            div.className = 'card stream-card';
+            div.id = `stream-${id}`;
+            
+            div.innerHTML = `
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <span class="status-indicator status-active"></span>
+                        ${data.channel_name || 'Unknown Channel'}
+                    </h5>
+                    <span class="stream-duration" data-start-time="${data.start_time}">
+                        Duration: ${durationText}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <span class="portal-badge">
+                        <i class="fas fa-server"></i> ${data.portal_name || 'Unknown Portal'}
+                    </span>
+                    <dl class="row stream-details">
+                        <dt class="col-sm-3">MAC Address:</dt>
+                        <dd class="col-sm-9">${data.mac || 'Unknown'}</dd>
+                        
+                        <dt class="col-sm-3">Client IP:</dt>
+                        <dd class="col-sm-9">${data.client_ip || 'Unknown'}</dd>
+                        
+                        <dt class="col-sm-3">Started:</dt>
+                        <dd class="col-sm-9">${new Date(startTime).toLocaleString()}</dd>
+                    </dl>
+                </div>
+            `;
+            
+            return div;
+        }
+        
+        // Update an existing stream element
+        function updateStreamElement(id, data) {
+            const element = document.getElementById(`stream-${id}`);
+            if (!element) return;
+            
+            // Update duration
+            const durationElement = element.querySelector('.stream-duration');
+            if (durationElement) {
+                const startTime = data.start_time * 1000; // Convert to milliseconds
+                const now = Date.now();
+                const durationMs = now - startTime;
+                const durationMinutes = Math.floor(durationMs / (1000 * 60));
+                const durationSeconds = Math.floor((durationMs % (1000 * 60)) / 1000);
+                const durationText = `Duration: ${durationMinutes}m ${durationSeconds}s`;
+                
+                durationElement.textContent = durationText;
+                durationElement.setAttribute('data-start-time', data.start_time);
+            }
+        }
+        
+        // Manual refresh button
+        refreshButton.addEventListener('click', function() {
+            fetch('/api/active-streams')
+                .then(response => response.json())
+                .then(data => {
+                    updateStreamDisplay(data.active_streams);
+                    activeStreamCount.textContent = data.count;
+                    
+                    const updateTime = new Date();
+                    lastUpdateTime.textContent = 'Last update: ' + updateTime.toLocaleTimeString();
+                    
+                    showAlert('Stream data refreshed', 'success');
+                })
+                .catch(error => {
+                    console.error('Error fetching stream data:', error);
+                    showAlert('Failed to refresh stream data', 'danger');
+                });
+        });
+        
+        // Initial fetch of data
+        refreshButton.click();
+        
+        // Update durations every second
+        setInterval(function() {
+            const durationElements = document.querySelectorAll('.stream-duration');
+            durationElements.forEach(element => {
+                const startTime = parseInt(element.getAttribute('data-start-time')) * 1000;
+                const now = Date.now();
+                const durationMs = now - startTime;
+                const durationMinutes = Math.floor(durationMs / (1000 * 60));
+                const durationSeconds = Math.floor((durationMs % (1000 * 60)) / 1000);
+                const durationText = `Duration: ${durationMinutes}m ${durationSeconds}s`;
+                
+                element.textContent = durationText;
+            });
+        }, 1000);
+    });
+</script>
+{% endblock %} 

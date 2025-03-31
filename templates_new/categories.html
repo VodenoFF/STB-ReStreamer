@@ -1,0 +1,381 @@
+{% extends "layout.html" %}
+
+{% block title %}Category Management{% endblock %}
+
+{% block content %}
+<div class="content-wrapper">
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">Category Management</h1>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="container-fluid">
+            <div class="row">
+                <!-- Category List -->
+                <div class="col-md-5">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Categories</h3>
+                            <div class="card-tools">
+                                <button type="button" class="btn btn-primary btn-sm" data-toggle="modal" data-target="#addCategoryModal">
+                                    <i class="fas fa-plus"></i> Add Category
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Channels</th>
+                                        <th>Default</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for category in categories %}
+                                    <tr>
+                                        <td>{{ category.name }}</td>
+                                        <td>
+                                            <span class="badge badge-info">{{ category.channels|length }}</span>
+                                        </td>
+                                        <td>
+                                            {% if category.is_default %}
+                                            <span class="badge badge-success">Default</span>
+                                            {% else %}
+                                            <form action="{{ url_for('categories.set_default_category', category_id=category.id) }}" method="post" style="display: inline;">
+                                                <button type="submit" class="btn btn-outline-primary btn-xs">
+                                                    Set Default
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <button type="button" class="btn btn-info btn-xs view-channels-btn" 
+                                                        data-category-id="{{ category.id }}" 
+                                                        data-category-name="{{ category.name }}">
+                                                    <i class="fas fa-list"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-warning btn-xs" 
+                                                        data-toggle="modal" 
+                                                        data-target="#editCategoryModal" 
+                                                        data-category-id="{{ category.id }}" 
+                                                        data-category-name="{{ category.name }}">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                {% if not category.is_default %}
+                                                <button type="button" class="btn btn-danger btn-xs" 
+                                                        data-toggle="modal" 
+                                                        data-target="#deleteCategoryModal" 
+                                                        data-category-id="{{ category.id }}" 
+                                                        data-category-name="{{ category.name }}">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="4" class="text-center">No categories found</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Category Details / Channel Assignment -->
+                <div class="col-md-7">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <span id="category-detail-title">Assign Channels to Category</span>
+                            </h3>
+                            <div class="card-tools">
+                                <div class="input-group input-group-sm" style="width: 250px;">
+                                    <input type="text" id="channel-search" class="form-control" placeholder="Search Channels">
+                                    <div class="input-group-append">
+                                        <div class="btn btn-default">
+                                            <i class="fas fa-search"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body" id="channel-assignment-section">
+                            <form action="{{ url_for('categories.assign_channels') }}" method="post" id="assign-channels-form">
+                                <div class="form-group">
+                                    <label for="category_id">Select Category</label>
+                                    <select name="category_id" id="category_id" class="form-control" required>
+                                        <option value="">-- Select Category --</option>
+                                        {% for category in categories %}
+                                        <option value="{{ category.id }}">{{ category.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Select Channels ({{ channel_count }} total)</label>
+                                    <div class="callout callout-info">
+                                        <p>Select channels to add to the selected category. You can use the search box to filter channels.</p>
+                                    </div>
+                                    
+                                    <div style="max-height: 400px; overflow-y: auto;">
+                                        <table class="table table-sm table-hover" id="channels-table">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width: 40px;">
+                                                        <div class="icheck-primary">
+                                                            <input type="checkbox" id="check-all">
+                                                            <label for="check-all"></label>
+                                                        </div>
+                                                    </th>
+                                                    <th>Channel</th>
+                                                    <th>Number</th>
+                                                    <th>Portal</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for channel in channels %}
+                                                <tr class="channel-row">
+                                                    <td>
+                                                        <div class="icheck-primary">
+                                                            <input type="checkbox" name="channel_ids" id="channel-{{ channel.portal_id }}-{{ channel.id }}" 
+                                                                   value="{{ channel.portal_id }}|{{ channel.id }}">
+                                                            <label for="channel-{{ channel.portal_id }}-{{ channel.id }}"></label>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        {% if channel.logo %}
+                                                        <img src="{{ channel.logo }}" alt="{{ channel.name }}" class="img-size-32 mr-2" 
+                                                             onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'32\' height=\'32\' viewBox=\'0 0 32 32\'%3E%3Crect width=\'32\' height=\'32\' fill=\'%23cccccc\'/%3E%3Ctext x=\'16\' y=\'16\' font-family=\'Arial\' font-size=\'6\' text-anchor=\'middle\' dominant-baseline=\'middle\' fill=\'%23555555\'%3ETV%3C/text%3E%3C/svg%3E'; this.onerror='';">
+                                                        {% else %}
+                                                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23cccccc'/%3E%3Ctext x='16' y='16' font-family='Arial' font-size='6' text-anchor='middle' dominant-baseline='middle' fill='%23555555'%3ETV%3C/text%3E%3C/svg%3E" alt="{{ channel.name }}" class="img-size-32 mr-2">
+                                                        {% endif %}
+                                                        {{ channel.name }}
+                                                    </td>
+                                                    <td>{{ channel.number if channel.number else 'N/A' }}</td>
+                                                    <td>{{ channel.portal_name }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <button type="submit" class="btn btn-primary">Assign Selected Channels</button>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <div class="card-body d-none" id="category-channels-section">
+                            <div class="d-flex justify-content-between mb-3">
+                                <h5 id="category-channels-title">Channels in Category</h5>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="back-to-assign">
+                                    <i class="fas fa-arrow-left"></i> Back to Assignment
+                                </button>
+                            </div>
+                            
+                            <div id="category-channels-loader" class="text-center py-3">
+                                <i class="fas fa-spinner fa-pulse fa-2x"></i>
+                                <p>Loading channels...</p>
+                            </div>
+                            
+                            <div id="category-channels-list" style="max-height: 500px; overflow-y: auto;">
+                                <!-- Channels will be loaded here via AJAX -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Category Modal -->
+<div class="modal fade" id="addCategoryModal" tabindex="-1" role="dialog" aria-labelledby="addCategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addCategoryModalLabel">Add New Category</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form action="{{ url_for('categories.add_category') }}" method="post">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="name">Category Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Category</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Category Modal -->
+<div class="modal fade" id="editCategoryModal" tabindex="-1" role="dialog" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editCategoryModalLabel">Edit Category</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="edit-category-form" action="" method="post">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="edit-name">Category Name</label>
+                        <input type="text" class="form-control" id="edit-name" name="name" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Category</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Category Modal -->
+<div class="modal fade" id="deleteCategoryModal" tabindex="-1" role="dialog" aria-labelledby="deleteCategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteCategoryModalLabel">Delete Category</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the category <strong id="delete-category-name"></strong>?</p>
+                <p class="text-danger">This will remove all channel assignments for this category.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <form id="delete-category-form" action="" method="post">
+                    <button type="submit" class="btn btn-danger">Delete Category</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(function() {
+    // Handle edit modal show
+    $('#editCategoryModal').on('show.bs.modal', function (event) {
+        const button = $(event.relatedTarget);
+        const categoryId = button.data('category-id');
+        const categoryName = button.data('category-name');
+        
+        const modal = $(this);
+        modal.find('#edit-name').val(categoryName);
+        modal.find('#edit-category-form').attr('action', '/categories/update/' + categoryId);
+    });
+
+    // Handle delete modal show
+    $('#deleteCategoryModal').on('show.bs.modal', function (event) {
+        const button = $(event.relatedTarget);
+        const categoryId = button.data('category-id');
+        const categoryName = button.data('category-name');
+        
+        const modal = $(this);
+        modal.find('#delete-category-name').text(categoryName);
+        modal.find('#delete-category-form').attr('action', '/categories/delete/' + categoryId);
+    });
+
+    // Check all channels
+    $('#check-all').change(function() {
+        $('input[name="channel_ids"]').prop('checked', $(this).is(':checked'));
+    });
+
+    // Channel search
+    $('#channel-search').keyup(function() {
+        const searchText = $(this).val().toLowerCase();
+        $('.channel-row').each(function() {
+            const channelText = $(this).text().toLowerCase();
+            $(this).toggle(channelText.indexOf(searchText) > -1);
+        });
+    });
+
+    // View channels in category
+    $('.view-channels-btn').click(function() {
+        const categoryId = $(this).data('category-id');
+        const categoryName = $(this).data('category-name');
+        
+        // Update UI
+        $('#category-detail-title').text('Channels in ' + categoryName);
+        $('#category-channels-title').text('Channels in ' + categoryName);
+        $('#channel-assignment-section').addClass('d-none');
+        $('#category-channels-section').removeClass('d-none');
+        
+        // Show loader
+        $('#category-channels-loader').show();
+        $('#category-channels-list').empty();
+        
+        // Load channels via AJAX
+        $.getJSON('/categories/api/channels/' + categoryId, function(data) {
+            $('#category-channels-loader').hide();
+            
+            if (data.channels.length === 0) {
+                $('#category-channels-list').html('<div class="alert alert-info">No channels in this category</div>');
+                return;
+            }
+            
+            // Build channel list
+            let html = '<div class="list-group">';
+            data.channels.forEach(function(channel) {
+                const logoUrl = channel.logo || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'32\' height=\'32\' viewBox=\'0 0 32 32\'%3E%3Crect width=\'32\' height=\'32\' fill=\'%23cccccc\'/%3E%3Ctext x=\'16\' y=\'16\' font-family=\'Arial\' font-size=\'6\' text-anchor=\'middle\' dominant-baseline=\'middle\' fill=\'%23555555\'%3ETV%3C/text%3E%3C/svg%3E';
+                html += `
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between align-items-center">
+                            <div>
+                                <img src="${logoUrl}" alt="${channel.name}" class="img-size-32 mr-2"
+                                     onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'32\' height=\'32\' viewBox=\'0 0 32 32\'%3E%3Crect width=\'32\' height=\'32\' fill=\'%23cccccc\'/%3E%3Ctext x=\'16\' y=\'16\' font-family=\'Arial\' font-size=\'6\' text-anchor=\'middle\' dominant-baseline=\'middle\' fill=\'%23555555\'%3ETV%3C/text%3E%3C/svg%3E'; this.onerror='';">
+                                <span>${channel.name}</span>
+                                <small class="text-muted ml-2">${channel.portal_name}</small>
+                            </div>
+                            <form action="/categories/unassign/${channel.portal_id}/${channel.id}/${categoryId}" method="post">
+                                <button type="submit" class="btn btn-outline-danger btn-xs">
+                                    <i class="fas fa-times"></i> Remove
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            $('#category-channels-list').html(html);
+        });
+    });
+
+    // Back to assignment
+    $('#back-to-assign').click(function() {
+        $('#category-detail-title').text('Assign Channels to Category');
+        $('#category-channels-section').addClass('d-none');
+        $('#channel-assignment-section').removeClass('d-none');
+    });
+});
+</script>
+{% endblock %}

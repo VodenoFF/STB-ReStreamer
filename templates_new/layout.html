@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}STB-ReStreamer{% endblock %}</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+    <style>
+        /* Basic styles for sidebar */
+        body {
+            min-height: 100vh;
+        }
+        .sidebar {
+            width: 250px;
+            min-height: 100vh;
+            background-color: #212529;
+            color: white;
+            transition: all 0.3s;
+        }
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            margin: 0.2rem 0;
+        }
+        .sidebar .nav-link:hover {
+            color: white;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .sidebar .nav-link.active {
+            color: white;
+            background-color: #0d6efd;
+        }
+        .sidebar .nav-link i {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+        }
+        .content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .navbar-brand img {
+            height: 30px;
+            margin-right: 10px;
+        }
+        /* Custom styles for alerts */
+        .alert-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1050;
+            max-width: 350px;
+        }
+        .alert-float {
+            margin-bottom: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="d-flex">
+        <!-- Sidebar -->
+        <div class="sidebar d-none d-md-block">
+            <div class="p-3">
+                <h3 class="text-center">STB-ReStreamer</h3>
+                <hr>
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{{ url_for('main.index') }}">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/portals' in request.path %}active{% endif %}" href="{{ url_for('portals.list_portals') }}">
+                            <i class="fas fa-server"></i> Portals
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/groups' in request.path %}active{% endif %}" href="{{ url_for('groups.list_groups') }}">
+                            <i class="fas fa-layer-group"></i> Channel Groups
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/categories' in request.path %}active{% endif %}" href="{{ url_for('categories.list_categories') }}">
+                            <i class="fas fa-tags"></i> Categories
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/channels' in request.path %}active{% endif %}" href="{{ url_for('channels.list_channels') }}">
+                            <i class="fas fa-tv"></i> Channel Preview
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/editor' in request.path %}active{% endif %}" href="{{ url_for('editor.editor') }}">
+                            <i class="fas fa-edit"></i> Channel Editor
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/epg' in request.path %}active{% endif %}" href="{{ url_for('epg.dashboard') }}">
+                            <i class="fas fa-calendar-alt"></i> EPG
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/streams' in request.path %}active{% endif %}" href="{{ url_for('stream_status.streams_dashboard') }}">
+                            <i class="fas fa-play-circle"></i> Streams
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/alerts' in request.path %}active{% endif %}" href="{{ url_for('main.alerts') }}">
+                            <i class="fas fa-bell"></i> Alerts
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/settings' in request.path %}active{% endif %}" href="{{ url_for('settings.general_settings') }}">
+                            <i class="fas fa-cog"></i> Settings
+                        </a>
+                    </li>
+                </ul>
+                <hr>
+                <div class="text-center">
+                    <a href="{{ url_for('main.logout') }}" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main content -->
+        <div class="content">
+            <!-- Top navbar for mobile -->
+            <nav class="navbar navbar-expand-md navbar-dark bg-dark d-md-none mb-4">
+                <div class="container-fluid">
+                    <a class="navbar-brand" href="{{ url_for('main.index') }}">
+                        STB-ReStreamer
+                    </a>
+                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                    <div class="collapse navbar-collapse" id="navbarNav">
+                        <ul class="navbar-nav">
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{{ url_for('main.index') }}">
+                                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/portals' in request.path %}active{% endif %}" href="{{ url_for('portals.list_portals') }}">
+                                    <i class="fas fa-server"></i> Portals
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/groups' in request.path %}active{% endif %}" href="{{ url_for('groups.list_groups') }}">
+                                    <i class="fas fa-layer-group"></i> Channel Groups
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/categories' in request.path %}active{% endif %}" href="{{ url_for('categories.list_categories') }}">
+                                    <i class="fas fa-tags"></i> Categories
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/channels' in request.path %}active{% endif %}" href="{{ url_for('channels.list_channels') }}">
+                                    <i class="fas fa-tv"></i> Channel Preview
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/editor' in request.path %}active{% endif %}" href="{{ url_for('editor.editor') }}">
+                                    <i class="fas fa-edit"></i> Channel Editor
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/epg' in request.path %}active{% endif %}" href="{{ url_for('epg.dashboard') }}">
+                                    <i class="fas fa-calendar-alt"></i> EPG
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/streams' in request.path %}active{% endif %}" href="{{ url_for('stream_status.streams_dashboard') }}">
+                                    <i class="fas fa-play-circle"></i> Streams
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/alerts' in request.path %}active{% endif %}" href="{{ url_for('main.alerts') }}">
+                                    <i class="fas fa-bell"></i> Alerts
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/settings' in request.path %}active{% endif %}" href="{{ url_for('settings.general_settings') }}">
+                                    <i class="fas fa-cog"></i> Settings
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('main.logout') }}">
+                                    <i class="fas fa-sign-out-alt"></i> Logout
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Page content -->
+            <div class="container-fluid">
+                <!-- Page header -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3">{% block page_title %}{{ title }}{% endblock %}</h1>
+                    {% block page_actions %}{% endblock %}
+                </div>
+
+                <!-- Flash messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Main content -->
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert container for dynamic alerts -->
+    <div class="alert-container"></div>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <script>
+        // Function to show dynamic alerts
+        function showAlert(message, type = 'info', timeout = 5000) {
+            const alertHtml = `
+                <div class="alert alert-${type} alert-dismissible fade show alert-float" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            const alertContainer = document.querySelector('.alert-container');
+            alertContainer.insertAdjacentHTML('beforeend', alertHtml);
+            
+            const alertElement = alertContainer.lastElementChild;
+            setTimeout(() => {
+                $(alertElement).fadeOut('slow', function() {
+                    $(this).remove();
+                });
+            }, timeout);
+        }
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

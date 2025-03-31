@@ -1,0 +1,396 @@
+{% extends "layout.html" %}
+
+{% block title %}EPG Management{% endblock %}
+
+{% block content %}
+<div class="content-wrapper">
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">EPG Management</h1>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="container-fluid">
+            <div class="row">
+                <!-- EPG Status Card -->
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">EPG Status</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Status:</span>
+                                <span class="badge {% if settings.enabled %}badge-success{% else %}badge-danger{% endif %}">
+                                    {% if settings.enabled %}Enabled{% else %}Disabled{% endif %}
+                                </span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Update Interval:</span>
+                                <span>{{ settings.update_interval }} hours</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Cache Duration:</span>
+                                <span>{{ settings.cache_days }} days</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Total Channels:</span>
+                                <span>{{ stats.channels }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Total Programs:</span>
+                                <span>{{ stats.programs }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Last Update:</span>
+                                <span>{{ stats.last_update|default('Never') }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Next Update:</span>
+                                <span>{{ stats.next_update|default('N/A') }}</span>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <div class="btn-group w-100">
+                                <form action="{{ url_for('epg.toggle_epg') }}" method="post" class="mr-2">
+                                    <button type="submit" class="btn {% if settings.enabled %}btn-danger{% else %}btn-success{% endif %}">
+                                        {% if settings.enabled %}Disable EPG{% else %}Enable EPG{% endif %}
+                                    </button>
+                                </form>
+                                <form action="{{ url_for('epg.update_epg') }}" method="post">
+                                    <button type="submit" class="btn btn-primary" {% if not settings.enabled %}disabled{% endif %}>
+                                        Update Now
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- EPG Settings Card -->
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">EPG Settings</h3>
+                        </div>
+                        <div class="card-body">
+                            <form action="{{ url_for('epg.update_settings') }}" method="post">
+                                <div class="form-group">
+                                    <label for="update_interval">Update Interval (hours)</label>
+                                    <input type="number" class="form-control" id="update_interval" name="update_interval" 
+                                           value="{{ settings.update_interval }}" min="1" max="48" required>
+                                    <small class="form-text text-muted">How often to refresh EPG data.</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="cache_days">Cache Duration (days)</label>
+                                    <input type="number" class="form-control" id="cache_days" name="cache_days" 
+                                           value="{{ settings.cache_days }}" min="1" max="14" required>
+                                    <small class="form-text text-muted">How many days of EPG data to keep.</small>
+                                </div>
+                                <div class="form-group">
+                                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="card-footer">
+                            <form action="{{ url_for('epg.clear_epg') }}" method="post">
+                                <button type="submit" class="btn btn-warning">
+                                    Clear EPG Data
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- EPG Sources Card -->
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">EPG Sources</h3>
+                            <div class="card-tools">
+                                <button type="button" class="btn btn-primary btn-sm" data-toggle="modal" data-target="#addSourceModal">
+                                    <i class="fas fa-plus"></i> Add Source
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>URL</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for source in settings.sources %}
+                                    <tr>
+                                        <td>{{ source.name }}</td>
+                                        <td>
+                                            <small class="text-muted">{{ source.url[:30] }}{% if source.url|length > 30 %}...{% endif %}</small>
+                                        </td>
+                                        <td>
+                                            <form action="{{ url_for('epg.delete_source', source_id=source.id) }}" method="post">
+                                                <button type="submit" class="btn btn-danger btn-xs">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="3" class="text-center">No sources defined</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EPG Sample Data -->
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Current EPG Data Sample</h3>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Channel</th>
+                                            <th>Current Program</th>
+                                            <th>Start Time</th>
+                                            <th>End Time</th>
+                                            <th>Progress</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for channel_id, program in sample_programs.items() %}
+                                        <tr>
+                                            <td>
+                                                {% if program.channel_logo %}
+                                                <img src="{{ program.channel_logo }}" alt="{{ program.channel_name }}" class="img-size-32 mr-2" 
+                                                     onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'32\' height=\'32\' viewBox=\'0 0 32 32\'%3E%3Crect width=\'32\' height=\'32\' fill=\'%23cccccc\'/%3E%3Ctext x=\'16\' y=\'16\' font-family=\'Arial\' font-size=\'6\' text-anchor=\'middle\' dominant-baseline=\'middle\' fill=\'%23555555\'%3ETV%3C/text%3E%3C/svg%3E'; this.onerror='';">
+                                                {% else %}
+                                                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23cccccc'/%3E%3Ctext x='16' y='16' font-family='Arial' font-size='6' text-anchor='middle' dominant-baseline='middle' fill='%23555555'%3ETV%3C/text%3E%3C/svg%3E" alt="{{ program.channel_name }}" class="img-size-32 mr-2">
+                                                {% endif %}
+                                                {{ program.channel_name }}
+                                            </td>
+                                            <td>{{ program.title }}</td>
+                                            <td>{{ program.start_time|timestamp_to_time }}</td>
+                                            <td>{{ program.end_time|timestamp_to_time }}</td>
+                                            <td>
+                                                {% set progress = ((now - program.start_time) / (program.end_time - program.start_time) * 100)|int %}
+                                                <div class="progress">
+                                                    <div class="progress-bar bg-primary" role="progressbar" 
+                                                         style="width: {{ progress }}%" 
+                                                         aria-valuenow="{{ progress }}" aria-valuemin="0" aria-valuemax="100">
+                                                        {{ progress }}%
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="5" class="text-center">No EPG data available</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Channel Mapping -->
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Channel EPG Mapping</h3>
+                            <div class="card-tools">
+                                <div class="input-group input-group-sm" style="width: 250px;">
+                                    <input type="text" id="channel-search" class="form-control" placeholder="Search Channels">
+                                    <div class="input-group-append">
+                                        <div class="btn btn-default">
+                                            <i class="fas fa-search"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="callout callout-info">
+                                <p>Map your channels to specific EPG identifiers. This is useful when your EPG source uses different channel IDs than your providers.</p>
+                            </div>
+                            
+                            <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                                <table class="table table-sm table-hover" id="channels-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Channel</th>
+                                            <th>Portal</th>
+                                            <th>EPG Mapping</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for channel in channels %}
+                                        <tr class="channel-row">
+                                            <td>
+                                                {% if channel.logo %}
+                                                <img src="{{ channel.logo }}" alt="{{ channel.name }}" class="img-size-32 mr-2" 
+                                                     onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'32\' height=\'32\' viewBox=\'0 0 32 32\'%3E%3Crect width=\'32\' height=\'32\' fill=\'%23cccccc\'/%3E%3Ctext x=\'16\' y=\'16\' font-family=\'Arial\' font-size=\'6\' text-anchor=\'middle\' dominant-baseline=\'middle\' fill=\'%23555555\'%3ETV%3C/text%3E%3C/svg%3E'; this.onerror='';">
+                                                {% else %}
+                                                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23cccccc'/%3E%3Ctext x='16' y='16' font-family='Arial' font-size='6' text-anchor='middle' dominant-baseline='middle' fill='%23555555'%3ETV%3C/text%3E%3C/svg%3E" alt="{{ channel.name }}" class="img-size-32 mr-2">
+                                                {% endif %}
+                                                {{ channel.name }}
+                                            </td>
+                                            <td>{{ channel.portal_name }}</td>
+                                            <td>
+                                                {% set mapping_key = channel.portal_id + ':' + channel.id %}
+                                                {% if mapping_key in epg_manager.get_mappings() %}
+                                                <code>{{ epg_manager.get_mappings()[mapping_key] }}</code>
+                                                {% else %}
+                                                <span class="badge badge-secondary">No mapping</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group">
+                                                    <button type="button" class="btn btn-info btn-xs" 
+                                                            data-toggle="modal" 
+                                                            data-target="#mapChannelModal" 
+                                                            data-channel-id="{{ channel.portal_id }}:{{ channel.id }}" 
+                                                            data-channel-name="{{ channel.name }}"
+                                                            data-portal-name="{{ channel.portal_name }}">
+                                                        <i class="fas fa-map-marker-alt"></i> Map
+                                                    </button>
+                                                    {% set mapping_key = channel.portal_id + ':' + channel.id %}
+                                                    {% if mapping_key in epg_manager.get_mappings() %}
+                                                    <form action="{{ url_for('epg.unmap_channel', portal_id=channel.portal_id, channel_id=channel.id) }}" method="post">
+                                                        <button type="submit" class="btn btn-danger btn-xs">
+                                                            <i class="fas fa-unlink"></i> Unmap
+                                                        </button>
+                                                    </form>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Source Modal -->
+<div class="modal fade" id="addSourceModal" tabindex="-1" role="dialog" aria-labelledby="addSourceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addSourceModalLabel">Add EPG Source</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form action="{{ url_for('epg.add_source') }}" method="post">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="name">Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="url">XMLTV URL</label>
+                        <input type="url" class="form-control" id="url" name="url" 
+                               placeholder="http://example.com/epg.xml" required>
+                        <small class="form-text text-muted">URL to an XMLTV file. Can be local file path (file:///path/to/epg.xml) or remote URL.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Source</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Map Channel Modal -->
+<div class="modal fade" id="mapChannelModal" tabindex="-1" role="dialog" aria-labelledby="mapChannelModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="mapChannelModalLabel">Map Channel to EPG</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form action="{{ url_for('epg.map_channel') }}" method="post">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Channel</label>
+                        <input type="hidden" id="channel_id" name="channel_id">
+                        <p id="channel_name_display" class="form-control-static"></p>
+                    </div>
+                    <div class="form-group">
+                        <label for="epg_channel_id">EPG Channel ID</label>
+                        <input type="text" class="form-control" id="epg_channel_id" name="epg_channel_id" required>
+                        <small class="form-text text-muted">
+                            The ID used in the EPG XML file for this channel. For example: "HBO.com" or "ESPN.us".
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Map Channel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(function() {
+    // Initialize timestamp value for progress bars
+    window.now = {{ now|default(0) }};
+    
+    // Handle map channel modal show
+    $('#mapChannelModal').on('show.bs.modal', function (event) {
+        const button = $(event.relatedTarget);
+        const channelId = button.data('channel-id');
+        const channelName = button.data('channel-name');
+        const portalName = button.data('portal-name');
+        
+        const modal = $(this);
+        modal.find('#channel_id').val(channelId);
+        modal.find('#channel_name_display').text(channelName + ' (' + portalName + ')');
+    });
+
+    // Channel search
+    $('#channel-search').keyup(function() {
+        const searchText = $(this).val().toLowerCase();
+        $('.channel-row').each(function() {
+            const channelText = $(this).text().toLowerCase();
+            $(this).toggle(channelText.indexOf(searchText) > -1);
+        });
+    });
+});
+</script>
+{% endblock %}

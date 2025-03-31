@@ -1,0 +1,684 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .channel-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+    .channel-table th {
+        background-color: #343a40;
+        color: white;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    .channel-table td, .channel-table th {
+        padding: 8px;
+        vertical-align: middle;
+        border: 1px solid #dee2e6;
+    }
+    .channel-table tr:nth-child(even) {
+        background-color: #f2f2f2;
+    }
+    .editor-container {
+        margin-top: 15px;
+    }
+    .sticky-actions {
+        position: sticky;
+        top: 60px;
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        z-index: 9;
+    }
+    .channel-thumbnail {
+        width: 50px;
+        height: 28px;
+        object-fit: contain;
+        background-color: #000;
+        border-radius: 2px;
+    }
+    .form-control-sm {
+        height: calc(1.5em + 0.5rem + 2px);
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        border-radius: 0.2rem;
+    }
+    .filters {
+        margin-bottom: 15px;
+    }
+    .filter-group {
+        margin-bottom: 10px;
+    }
+    .channel-preview {
+        cursor: pointer;
+    }
+    .alert {
+        margin-top: 15px;
+    }
+    /* Show only on small screens */
+    @media (max-width: 767.98px) {
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .channel-thumbnail {
+            width: 40px;
+            height: 22px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block page_title %}Channel Editor{% endblock %}
+
+{% block page_actions %}
+<form id="saveForm" action="{{ url_for('editor.editor_save') }}" method="post" class="d-inline">
+    <input type="hidden" name="enabledEdits" id="enabledEdits" value="[]">
+    <input type="hidden" name="numberEdits" id="numberEdits" value="[]">
+    <input type="hidden" name="nameEdits" id="nameEdits" value="[]">
+    <input type="hidden" name="genreEdits" id="genreEdits" value="[]">
+    <input type="hidden" name="epgEdits" id="epgEdits" value="[]">
+    <input type="hidden" name="groupEdits" id="groupEdits" value="[]">
+    <button type="button" id="saveButton" class="btn btn-primary">
+        <i class="fas fa-save"></i> Save Changes
+    </button>
+</form>
+
+<form action="{{ url_for('editor.editor_reset') }}" method="post" class="d-inline ms-2"
+      onsubmit="return confirm('This will reset ALL channel customizations. Are you sure?');">
+    <button type="submit" class="btn btn-danger">
+        <i class="fas fa-undo"></i> Reset All
+    </button>
+</form>
+{% endblock %}
+
+{% block content %}
+<div class="editor-container">
+    <div class="alert alert-info">
+        <p><strong>Channel Editor Tips:</strong></p>
+        <ul>
+            <li>Use this editor to customize channels across all your portals.</li>
+            <li>Enable/disable channels, change names, numbers or genres.</li>
+            <li>Assign channels to groups for easier management.</li>
+            <li>Click the channel preview image to play the stream.</li>
+            <li>Don't forget to save your changes.</li>
+        </ul>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+        <div class="row">
+            <div class="col-md-4 filter-group">
+                <label for="portalFilter">Portal:</label>
+                <select id="portalFilter" class="form-control form-control-sm">
+                    <option value="">All Portals</option>
+                    {% for portal in portals %}
+                    <option value="{{ portal.id }}">{{ portal.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4 filter-group">
+                <label for="groupFilter">Group:</label>
+                <select id="groupFilter" class="form-control form-control-sm">
+                    <option value="">All Groups</option>
+                    <option value="none">No Group</option>
+                    {% for group_name in channel_groups %}
+                    <option value="{{ group_name }}">{{ group_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4 filter-group">
+                <label for="enabledFilter">Status:</label>
+                <select id="enabledFilter" class="form-control form-control-sm">
+                    <option value="">All Channels</option>
+                    <option value="enabled">Enabled Only</option>
+                    <option value="disabled">Disabled Only</option>
+                </select>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12 filter-group">
+                <label for="searchInput">Search:</label>
+                <input type="text" id="searchInput" class="form-control form-control-sm" 
+                       placeholder="Search by name, genre, number...">
+            </div>
+        </div>
+    </div>
+
+    <!-- Content area -->
+    <div class="container-fluid py-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="card mb-4">
+                    <div class="card-header pb-0">
+                        <h5 class="mb-0">Channel Editor</h5>
+                        <p class="text-sm mb-0">Manage all of your TV channels in one place</p>
+                    </div>
+                    <div class="card-body px-0 pt-0 pb-2">
+                        <!-- Loading indicator -->
+                        <div id="loadingIndicator" class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Loading channel data...</p>
+                        </div>
+                        
+                        <!-- Error message area -->
+                        <div id="errorArea" class="alert alert-danger mx-4 mt-3" style="display: none;">
+                            <h5 class="alert-heading">Error loading channel data</h5>
+                            <p id="errorMessage">An error occurred while loading channel data.</p>
+                            <hr>
+                            <div class="mb-0">
+                                <p><strong>Troubleshooting steps:</strong></p>
+                                <ol>
+                                    <li>Make sure you have at least one portal configured and enabled</li>
+                                    <li>Check that your portal credentials are correct</li>
+                                    <li>Verify your network connection to the portal server</li>
+                                </ol>
+                                <p><a href="{{ url_for('portals.list_portals') }}" class="btn btn-sm btn-outline-light">Manage Portals</a></p>
+                            </div>
+                        </div>
+                        
+                        <!-- No channels warning -->
+                        <div id="noChannelsWarning" class="alert alert-warning mx-4 mt-3" style="display: none;">
+                            <h5 class="alert-heading">No channels found</h5>
+                            <p>No channels were found in your enabled portals.</p>
+                            <hr>
+                            <div class="mb-0">
+                                <p><strong>Possible reasons:</strong></p>
+                                <ol>
+                                    <li>You don't have any portals configured</li>
+                                    <li>None of your portals are enabled</li>
+                                    <li>Your portals don't have any channels</li>
+                                    <li>There was an error retrieving channel data</li>
+                                </ol>
+                                <p><a href="{{ url_for('portals.list_portals') }}" class="btn btn-sm btn-outline-warning">Manage Portals</a></p>
+                            </div>
+                        </div>
+                        
+                        <!-- Editor controls -->
+                        <div id="editorControls" style="display: none;" class="mb-3 px-4">
+                            <div class="row g-3 align-items-center mb-3">
+                                <!-- Channel Table -->
+                                <div class="table-responsive">
+                                    <table id="channelTable" class="channel-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Preview</th>
+                                                <th>Enabled</th>
+                                                <th>Portal</th>
+                                                <th>Number</th>
+                                                <th>Custom Number</th>
+                                                <th>Channel Name</th>
+                                                <th>Custom Name</th>
+                                                <th>Genre</th>
+                                                <th>Custom Genre</th>
+                                                <th>EPG ID</th>
+                                                <th>Group</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="channelTableBody">
+                                            <tr>
+                                                <td colspan="11" class="text-center">
+                                                    <div class="spinner-border text-primary" role="status">
+                                                        <span class="sr-only">Loading...</span>
+                                                    </div>
+                                                    <p>Loading channels...</p>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Channel preview modal -->
+                        <div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+                            <div class="modal-dialog modal-lg">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="previewModalLabel">Channel Preview</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="ratio ratio-16x9">
+                                            <video id="previewPlayer" controls autoplay></video>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // Initialize variables to track changes
+        let enabledEdits = [];
+        let numberEdits = [];
+        let nameEdits = [];
+        let genreEdits = [];
+        let epgEdits = [];
+        let groupEdits = [];
+        let allChannels = [];
+        let allGroups = {};
+        
+        // Parse the channel groups
+        try {
+            allGroups = JSON.parse('{{ channel_groups|tojson }}');
+        } catch (e) {
+            console.error("Error parsing channel groups:", e);
+            allGroups = {};
+        }
+        
+        // Show loading indicator
+        $("#loadingIndicator").show();
+        $("#editorControls").hide();
+        $("#channelTable").hide();
+        $("#noChannelsWarning").hide();
+        $("#errorArea").hide();
+        
+        // Load channels data
+        $.ajax({
+            url: "{{ url_for('editor.editor_data') }}",
+            method: "GET",
+            dataType: "json",
+            success: function(response) {
+                // Hide loading indicator
+                $("#loadingIndicator").hide();
+                
+                // Check for empty data
+                if (!response.data || response.data.length === 0) {
+                    $("#noChannelsWarning").show();
+                    
+                    // If there are warnings, show them
+                    if (response.warnings && response.warnings.length > 0) {
+                        const warningsList = $("<ul></ul>");
+                        response.warnings.forEach(function(warning) {
+                            warningsList.append($("<li></li>").text(warning));
+                        });
+                        $("#noChannelsWarning .mb-0").append(warningsList);
+                    }
+                    
+                    return;
+                }
+                
+                // Show editor controls and table
+                $("#editorControls").show();
+                $("#channelTable").show();
+                
+                // Show any warnings as alerts
+                if (response.warnings && response.warnings.length > 0) {
+                    const warningsContainer = $("<div class='alert alert-info mx-4 mb-3'></div>");
+                    const warningsHeading = $("<h5 class='alert-heading'>Warnings</h5>");
+                    const warningsList = $("<ul class='mb-0'></ul>");
+                    
+                    response.warnings.forEach(function(warning) {
+                        warningsList.append($("<li></li>").text(warning));
+                    });
+                    
+                    warningsContainer.append(warningsHeading).append(warningsList);
+                    $("#editorControls").before(warningsContainer);
+                }
+                
+                allChannels = response.data;
+                populateTable(allChannels);
+            },
+            error: function(xhr, status, error) {
+                // Hide loading indicator
+                $("#loadingIndicator").hide();
+                
+                // Show error
+                $("#errorArea").show();
+                
+                // Parse error response
+                let errorMsg = "An error occurred while loading channel data.";
+                
+                try {
+                    const errorResponse = JSON.parse(xhr.responseText);
+                    if (errorResponse.error) {
+                        errorMsg = errorResponse.error;
+                    }
+                    
+                    // Add additional error details if available
+                    if (errorResponse.errors && errorResponse.errors.length > 0) {
+                        const errorList = $("<ul></ul>");
+                        errorResponse.errors.forEach(function(err) {
+                            errorList.append($("<li></li>").text(err));
+                        });
+                        $("#errorMessage").html(errorMsg + "<br>Details:").after(errorList);
+                    } else {
+                        $("#errorMessage").text(errorMsg);
+                    }
+                } catch (e) {
+                    // If JSON parsing fails, show the raw response or a generic message
+                    $("#errorMessage").text(xhr.responseText || errorMsg);
+                }
+            }
+        });
+        
+        // Populate the table with channels
+        function populateTable(channels) {
+            const tbody = $('#channelTableBody');
+            tbody.empty();
+            
+            if (channels.length === 0) {
+                tbody.html('<tr><td colspan="11" class="text-center">No channels found</td></tr>');
+                return;
+            }
+            
+            channels.forEach(function(channel) {
+                const row = $('<tr></tr>');
+                
+                // Preview column with thumbnail
+                row.append(`
+                    <td class="text-center">
+                        <img src="${channel.link}" 
+                             class="channel-thumbnail channel-preview" 
+                             data-stream="${channel.streamLink}"
+                             data-name="${channel.channelName}"
+                             alt="Preview">
+                    </td>
+                `);
+                
+                // Enabled/disabled toggle
+                row.append(`
+                    <td class="text-center">
+                        <div class="custom-control custom-switch">
+                            <input type="checkbox" class="custom-control-input enabled-toggle" 
+                                   id="enabled_${channel.portal}_${channel.channelId}" 
+                                   data-portal="${channel.portal}" 
+                                   data-channel="${channel.channelId}"
+                                   ${channel.enabled ? 'checked' : ''}>
+                            <label class="custom-control-label" 
+                                   for="enabled_${channel.portal}_${channel.channelId}"></label>
+                        </div>
+                    </td>
+                `);
+                
+                // Portal
+                row.append(`<td>${channel.portalName}</td>`);
+                
+                // Channel number
+                row.append(`<td>${channel.channelNumber}</td>`);
+                
+                // Custom channel number
+                row.append(`
+                    <td>
+                        <input type="text" 
+                               class="form-control form-control-sm custom-number-input" 
+                               data-portal="${channel.portal}" 
+                               data-channel="${channel.channelId}" 
+                               value="${channel.customChannelNumber || ''}">
+                    </td>
+                `);
+                
+                // Channel name
+                row.append(`<td>${channel.channelName}</td>`);
+                
+                // Custom channel name
+                row.append(`
+                    <td>
+                        <input type="text" 
+                               class="form-control form-control-sm custom-name-input" 
+                               data-portal="${channel.portal}" 
+                               data-channel="${channel.channelId}" 
+                               value="${channel.customChannelName || ''}">
+                    </td>
+                `);
+                
+                // Genre
+                row.append(`<td>${channel.genre}</td>`);
+                
+                // Custom genre
+                row.append(`
+                    <td>
+                        <input type="text" 
+                               class="form-control form-control-sm custom-genre-input" 
+                               data-portal="${channel.portal}" 
+                               data-channel="${channel.channelId}" 
+                               value="${channel.customGenre || ''}">
+                    </td>
+                `);
+                
+                // Custom EPG ID
+                row.append(`
+                    <td>
+                        <input type="text" 
+                               class="form-control form-control-sm custom-epg-input" 
+                               data-portal="${channel.portal}" 
+                               data-channel="${channel.channelId}" 
+                               value="${channel.customEpgId || ''}">
+                    </td>
+                `);
+                
+                // Group selection
+                let groupSelect = `
+                    <td>
+                        <select class="form-control form-control-sm group-select" 
+                                data-portal="${channel.portal}" 
+                                data-channel="${channel.channelId}">
+                            <option value="">None</option>
+                `;
+                
+                // Add options for each group
+                for (const groupName in allGroups) {
+                    const selected = channel.group === groupName ? 'selected' : '';
+                    groupSelect += `<option value="${groupName}" ${selected}>${groupName}</option>`;
+                }
+                
+                groupSelect += `</select></td>`;
+                row.append(groupSelect);
+                
+                tbody.append(row);
+            });
+            
+            // Initialize event handlers for the table
+            initTableEvents();
+        }
+        
+        // Initialize table event handlers
+        function initTableEvents() {
+            // Handle enabled toggle
+            $('.enabled-toggle').change(function() {
+                const portalId = $(this).data('portal');
+                const channelId = $(this).data('channel');
+                const enabled = $(this).prop('checked');
+                
+                // Update or add to edits array
+                updateEditArray(enabledEdits, portalId, channelId, "enabled", enabled);
+                $('#enabledEdits').val(JSON.stringify(enabledEdits));
+            });
+            
+            // Handle custom number changes
+            $('.custom-number-input').change(function() {
+                const portalId = $(this).data('portal');
+                const channelId = $(this).data('channel');
+                const value = $(this).val().trim();
+                
+                updateEditArray(numberEdits, portalId, channelId, "custom number", value);
+                $('#numberEdits').val(JSON.stringify(numberEdits));
+            });
+            
+            // Handle custom name changes
+            $('.custom-name-input').change(function() {
+                const portalId = $(this).data('portal');
+                const channelId = $(this).data('channel');
+                const value = $(this).val().trim();
+                
+                updateEditArray(nameEdits, portalId, channelId, "custom name", value);
+                $('#nameEdits').val(JSON.stringify(nameEdits));
+            });
+            
+            // Handle custom genre changes
+            $('.custom-genre-input').change(function() {
+                const portalId = $(this).data('portal');
+                const channelId = $(this).data('channel');
+                const value = $(this).val().trim();
+                
+                updateEditArray(genreEdits, portalId, channelId, "custom genre", value);
+                $('#genreEdits').val(JSON.stringify(genreEdits));
+            });
+            
+            // Handle custom EPG ID changes
+            $('.custom-epg-input').change(function() {
+                const portalId = $(this).data('portal');
+                const channelId = $(this).data('channel');
+                const value = $(this).val().trim();
+                
+                updateEditArray(epgEdits, portalId, channelId, "custom epg id", value);
+                $('#epgEdits').val(JSON.stringify(epgEdits));
+            });
+            
+            // Handle group selection changes
+            $('.group-select').change(function() {
+                const portalId = $(this).data('portal');
+                const channelId = $(this).data('channel');
+                const value = $(this).val();
+                
+                updateEditArray(groupEdits, portalId, channelId, "group", value);
+                $('#groupEdits').val(JSON.stringify(groupEdits));
+            });
+            
+            // Handle channel preview click
+            $('.channel-preview').click(function() {
+                const streamUrl = $(this).data('stream');
+                const channelName = $(this).data('name');
+                
+                $('#previewModalLabel').text('Preview: ' + channelName);
+                $('#previewPlayer').attr('src', streamUrl);
+                const previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
+                previewModal.show();
+            });
+            
+            // Stop video when modal is closed
+            $('#previewModal').on('hidden.bs.modal', function() {
+                $('#previewPlayer').removeAttr('src');
+            });
+        }
+        
+        // Update edit arrays
+        function updateEditArray(array, portalId, channelId, key, value) {
+            // Check if this channel is already in the edit array
+            const index = array.findIndex(item => 
+                item.portal === portalId && item["channel id"] === channelId
+            );
+            
+            if (index > -1) {
+                // Update existing entry
+                array[index][key] = value;
+            } else {
+                // Add new entry
+                const newEdit = {
+                    "portal": portalId,
+                    "channel id": channelId
+                };
+                newEdit[key] = value;
+                array.push(newEdit);
+            }
+        }
+        
+        // Filter channels
+        function filterChannels() {
+            const portalFilter = $('#portalFilter').val();
+            const groupFilter = $('#groupFilter').val();
+            const enabledFilter = $('#enabledFilter').val();
+            const searchInput = $('#searchInput').val().toLowerCase();
+            
+            const filteredChannels = allChannels.filter(channel => {
+                // Filter by portal
+                if (portalFilter && channel.portal !== portalFilter) {
+                    return false;
+                }
+                
+                // Filter by group
+                if (groupFilter) {
+                    if (groupFilter === 'none' && channel.group) {
+                        return false;
+                    } else if (groupFilter !== 'none' && channel.group !== groupFilter) {
+                        return false;
+                    }
+                }
+                
+                // Filter by enabled status
+                if (enabledFilter === 'enabled' && !channel.enabled) {
+                    return false;
+                } else if (enabledFilter === 'disabled' && channel.enabled) {
+                    return false;
+                }
+                
+                // Filter by search input
+                if (searchInput) {
+                    const searchableText = [
+                        channel.channelName,
+                        channel.customChannelName,
+                        channel.channelNumber,
+                        channel.customChannelNumber,
+                        channel.genre,
+                        channel.customGenre,
+                        channel.portalName
+                    ].join(' ').toLowerCase();
+                    
+                    if (!searchableText.includes(searchInput)) {
+                        return false;
+                    }
+                }
+                
+                return true;
+            });
+            
+            // Update table with filtered channels
+            populateTable(filteredChannels);
+        }
+        
+        // Handle filters
+        $('#portalFilter, #groupFilter, #enabledFilter').change(filterChannels);
+        $('#searchInput').keyup(filterChannels);
+        
+        // Handle save button
+        $('#saveButton').click(function() {
+            // Check if there are any changes
+            if (enabledEdits.length === 0 && 
+                numberEdits.length === 0 && 
+                nameEdits.length === 0 && 
+                genreEdits.length === 0 && 
+                epgEdits.length === 0 && 
+                groupEdits.length === 0) {
+                showAlert('warning', 'No changes to save');
+                return;
+            }
+            
+            $('#saveForm').submit();
+        });
+        
+        // Show alert
+        function showAlert(type, message) {
+            const alertHtml = `
+                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            
+            $('.editor-container').prepend(alertHtml);
+        }
+    });
+</script>
+{% endblock %} 

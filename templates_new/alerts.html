@@ -1,0 +1,161 @@
+{% extends "layout.html" %}
+
+{% block title %}System Alerts - STB-ReStreamer{% endblock %}
+
+{% block page_actions %}
+<div>
+    <button id="clearAllAlertsBtn" class="btn btn-danger">
+        <i class="fas fa-trash-alt me-2"></i>Clear All Alerts
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-transparent">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="mb-0">System Alerts</h5>
+            </div>
+            <div class="col-auto">
+                <div class="btn-group" role="group">
+                    <button id="filterAll" class="btn btn-outline-secondary btn-sm active">All</button>
+                    <button id="filterInfo" class="btn btn-outline-info btn-sm">Info</button>
+                    <button id="filterWarning" class="btn btn-outline-warning btn-sm">Warnings</button>
+                    <button id="filterError" class="btn btn-outline-danger btn-sm">Errors</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if alerts|length > 0 %}
+        <div class="table-responsive">
+            <table class="table table-hover" id="alertsTable">
+                <thead>
+                    <tr>
+                        <th>Level</th>
+                        <th>Title</th>
+                        <th>Message</th>
+                        <th>Timestamp</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in alerts %}
+                    <tr class="alert-row" data-level="{{ alert.level }}">
+                        <td>
+                            {% if alert.level == 'error' %}
+                            <span class="badge bg-danger">Error</span>
+                            {% elif alert.level == 'warning' %}
+                            <span class="badge bg-warning text-dark">Warning</span>
+                            {% else %}
+                            <span class="badge bg-info">Info</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ alert.title }}</td>
+                        <td>{{ alert.message }}</td>
+                        <td>{{ alert.timestamp|datetime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger delete-alert-btn" data-alert-id="{{ alert.id }}">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>No alerts found.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // Filter buttons
+        $('#filterAll').click(function() {
+            $('.alert-row').show();
+            $('.btn-group .btn').removeClass('active');
+            $(this).addClass('active');
+        });
+        
+        $('#filterInfo').click(function() {
+            $('.alert-row').hide();
+            $('.alert-row[data-level="info"]').show();
+            $('.btn-group .btn').removeClass('active');
+            $(this).addClass('active');
+        });
+        
+        $('#filterWarning').click(function() {
+            $('.alert-row').hide();
+            $('.alert-row[data-level="warning"]').show();
+            $('.btn-group .btn').removeClass('active');
+            $(this).addClass('active');
+        });
+        
+        $('#filterError').click(function() {
+            $('.alert-row').hide();
+            $('.alert-row[data-level="error"]').show();
+            $('.btn-group .btn').removeClass('active');
+            $(this).addClass('active');
+        });
+        
+        // Delete single alert
+        $('.delete-alert-btn').click(function() {
+            const alertId = $(this).data('alert-id');
+            
+            if (confirm('Are you sure you want to delete this alert?')) {
+                // In a real implementation, this would be an API call
+                $.ajax({
+                    url: '/api/delete-alert',
+                    type: 'POST',
+                    data: {
+                        alert_id: alertId
+                    },
+                    success: function() {
+                        showAlert('Alert deleted successfully', 'success');
+                        // Remove from table
+                        $(`[data-alert-id="${alertId}"]`).closest('tr').remove();
+                        
+                        // If no alerts left, show message
+                        if ($('#alertsTable tbody tr').length === 0) {
+                            $('#alertsTable').replaceWith(
+                                '<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i>No alerts found.</div>'
+                            );
+                        }
+                    },
+                    error: function() {
+                        showAlert('Failed to delete alert', 'danger');
+                    }
+                });
+            }
+        });
+        
+        // Clear all alerts
+        $('#clearAllAlertsBtn').click(function() {
+            if (confirm('Are you sure you want to clear all alerts? This cannot be undone.')) {
+                // In a real implementation, this would be an API call
+                $.ajax({
+                    url: '/api/clear-all-alerts',
+                    type: 'POST',
+                    success: function() {
+                        showAlert('All alerts cleared successfully', 'success');
+                        // Replace table with empty message
+                        $('.table-responsive').replaceWith(
+                            '<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i>No alerts found.</div>'
+                        );
+                    },
+                    error: function() {
+                        showAlert('Failed to clear alerts', 'danger');
+                    }
+                });
+            }
+        });
+    });
+</script>
+{% endblock %}

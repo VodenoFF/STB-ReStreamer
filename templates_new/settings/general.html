@@ -1,0 +1,147 @@
+{% extends "layout.html" %}
+
+{% block title %}General Settings - STB-ReStreamer{% endblock %}
+
+{% block page_actions %}
+<div class="btn-group">
+    <a href="{{ url_for('settings.backup_settings') }}" class="btn btn-outline-primary">
+        <i class="fas fa-download me-2"></i>Backup Settings
+    </a>
+    <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#restoreModal">
+        <i class="fas fa-upload me-2"></i>Restore Settings
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-3 mb-4">
+        <div class="list-group">
+            <a href="{{ url_for('settings.general_settings') }}" class="list-group-item list-group-item-action active">
+                <i class="fas fa-sliders-h me-2"></i>General Settings
+            </a>
+            <a href="{{ url_for('settings.hdhr_settings') }}" class="list-group-item list-group-item-action">
+                <i class="fas fa-broadcast-tower me-2"></i>HDHomeRun Settings
+            </a>
+        </div>
+    </div>
+    
+    <div class="col-lg-9">
+        <div class="card">
+            <div class="card-header bg-transparent">
+                <h5 class="mb-0">General Settings</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('settings.general_settings') }}">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="port" class="form-label">Server Port</label>
+                            <input type="number" class="form-control" id="port" name="port" 
+                                   value="{{ settings.get('port', 8001) }}" min="1" max="65535" required>
+                            <div class="form-text">The port STB-ReStreamer listens on</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="log_level" class="form-label">Log Level</label>
+                            <select class="form-select" id="log_level" name="log_level">
+                                <option value="DEBUG" {% if settings.get('log_level') == 'DEBUG' %}selected{% endif %}>DEBUG</option>
+                                <option value="INFO" {% if settings.get('log_level', 'INFO') == 'INFO' %}selected{% endif %}>INFO</option>
+                                <option value="WARNING" {% if settings.get('log_level') == 'WARNING' %}selected{% endif %}>WARNING</option>
+                                <option value="ERROR" {% if settings.get('log_level') == 'ERROR' %}selected{% endif %}>ERROR</option>
+                            </select>
+                            <div class="form-text">Logging verbosity level</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="admin_username" class="form-label">Admin Username</label>
+                            <input type="text" class="form-control" id="admin_username" name="admin_username" 
+                                   value="{{ settings.get('admin_username', 'admin') }}" required>
+                            <div class="form-text">Username for web UI access</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="admin_password" class="form-label">Admin Password</label>
+                            <input type="password" class="form-control" id="admin_password" name="admin_password" 
+                                   placeholder="Leave empty to keep current password">
+                            <div class="form-text">Password for web UI access</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="ffmpeg_path" class="form-label">FFmpeg Path</label>
+                            <input type="text" class="form-control" id="ffmpeg_path" name="ffmpeg_path" 
+                                   value="{{ settings.get('ffmpeg_path', '') }}" placeholder="ffmpeg">
+                            <div class="form-text">Path to FFmpeg executable (leave empty for default)</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="stream_timeout" class="form-label">Stream Timeout</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="stream_timeout" name="stream_timeout" 
+                                       value="{{ settings.get('stream_timeout', 30) }}" min="5" max="300">
+                                <span class="input-group-text">seconds</span>
+                            </div>
+                            <div class="form-text">Connection timeout for stream requests</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="cache_size" class="form-label">Cache Size</label>
+                            <input type="number" class="form-control" id="cache_size" name="cache_size" 
+                                   value="{{ settings.get('cache_size', 1000) }}" min="100" max="10000">
+                            <div class="form-text">Maximum number of entries in the stream cache</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="cache_ttl" class="form-label">Cache TTL</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="cache_ttl" name="cache_ttl" 
+                                       value="{{ settings.get('cache_ttl', 8) }}" min="1" max="48">
+                                <span class="input-group-text">hours</span>
+                            </div>
+                            <div class="form-text">Time to live for cached stream URLs</div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Save Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Restore Settings Modal -->
+<div class="modal fade" id="restoreModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Restore Settings</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('settings.restore_settings') }}" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Warning:</strong> Restoring settings will overwrite your current configuration.
+                    </div>
+                    <div class="mb-3">
+                        <label for="backup_file" class="form-label">Backup File</label>
+                        <input type="file" class="form-control" id="backup_file" name="backup_file" accept=".json" required>
+                        <div class="form-text">Select a STB-ReStreamer backup file (.json)</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Restore</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

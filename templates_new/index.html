@@ -1,0 +1,242 @@
+{% extends "layout.html" %}
+
+{% block title %}Dashboard - STB-ReStreamer{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <!-- Stats cards -->
+    <div class="col-md-3 mb-3">
+        <div class="card bg-primary text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-white-50">Active Streams</h6>
+                        <h3 class="m-0">{{ stats.active_streams }}</h3>
+                    </div>
+                    <div class="fs-1 opacity-50">
+                        <i class="fas fa-play-circle"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer d-flex align-items-center justify-content-between">
+                <a href="#streams-section" class="text-white-50 text-decoration-none small">View Details</a>
+                <div class="small text-white"><i class="fas fa-angle-right"></i></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card bg-success text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-white-50">Enabled Portals</h6>
+                        <h3 class="m-0">{{ stats.enabled_portals }}</h3>
+                    </div>
+                    <div class="fs-1 opacity-50">
+                        <i class="fas fa-server"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer d-flex align-items-center justify-content-between">
+                <a href="{{ url_for('portals.list_portals') }}" class="text-white-50 text-decoration-none small">View Details</a>
+                <div class="small text-white"><i class="fas fa-angle-right"></i></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card bg-warning text-dark h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-dark-50">Occupied MACs</h6>
+                        <h3 class="m-0">{{ stats.occupied_macs }}</h3>
+                    </div>
+                    <div class="fs-1 opacity-50">
+                        <i class="fas fa-network-wired"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer d-flex align-items-center justify-content-between">
+                <a href="#" class="text-dark-50 text-decoration-none small">View Details</a>
+                <div class="small text-dark"><i class="fas fa-angle-right"></i></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card bg-info text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-white-50">Total Portals</h6>
+                        <h3 class="m-0">{{ stats.total_portals }}</h3>
+                    </div>
+                    <div class="fs-1 opacity-50">
+                        <i class="fas fa-database"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer d-flex align-items-center justify-content-between">
+                <a href="{{ url_for('portals.list_portals') }}" class="text-white-50 text-decoration-none small">View Details</a>
+                <div class="small text-white"><i class="fas fa-angle-right"></i></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Active streams -->
+    <div class="col-md-8 mb-4" id="streams-section">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title m-0">
+                    <i class="fas fa-play-circle me-2"></i>Active Streams
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if active_streams|length > 0 %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Portal</th>
+                                <th>Channel</th>
+                                <th>MAC</th>
+                                <th>Client</th>
+                                <th>Duration</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stream_key, stream in active_streams.items() %}
+                            <tr>
+                                <td>{{ stream.portal_name }}</td>
+                                <td>{{ stream.channel_name }}</td>
+                                <td><code>{{ stream.mac }}</code></td>
+                                <td>{{ stream.client_ip }}</td>
+                                <td>
+                                    {% if stream.duration %}
+                                    {{ '{:02d}:{:02d}:{:02d}'.format(
+                                        (stream.duration // 3600),
+                                        (stream.duration % 3600 // 60),
+                                        (stream.duration % 60)
+                                    ) }}
+                                    {% else %}
+                                    00:00:00
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-danger stop-stream-btn" 
+                                            data-portal="{{ stream.portal_id }}" 
+                                            data-channel="{{ stream.channel_id }}">
+                                        <i class="fas fa-stop-circle"></i> Stop
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>No active streams at the moment.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent alerts -->
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title m-0">
+                    <i class="fas fa-bell me-2"></i>Recent Alerts
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_alerts|length > 0 %}
+                <div class="list-group list-group-flush">
+                    {% for alert in recent_alerts %}
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">
+                                {% if alert.level == 'error' %}
+                                <span class="badge bg-danger">Error</span>
+                                {% elif alert.level == 'warning' %}
+                                <span class="badge bg-warning text-dark">Warning</span>
+                                {% else %}
+                                <span class="badge bg-info">Info</span>
+                                {% endif %}
+                                {{ alert.title }}
+                            </h6>
+                            <small class="text-muted">
+                                {{ alert.timestamp|datetime('%Y-%m-%d %H:%M') }}
+                            </small>
+                        </div>
+                        <p class="mb-1 small">{{ alert.message }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('main.alerts') }}" class="btn btn-sm btn-outline-primary">
+                        View All Alerts
+                    </a>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>No recent alerts.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // Auto-refresh active streams every 30 seconds
+        setInterval(function() {
+            $.ajax({
+                url: '{{ url_for("streaming.api_active_streams") }}',
+                type: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    // Update content (in a real implementation)
+                    console.log('Refreshed active streams');
+                }
+            });
+        }, 30000);
+        
+        // Handle stop stream button clicks
+        $('.stop-stream-btn').click(function() {
+            const portalId = $(this).data('portal');
+            const channelId = $(this).data('channel');
+            
+            if (confirm('Are you sure you want to stop this stream?')) {
+                // In a real implementation, this would be an API call
+                $.ajax({
+                    url: '/api/stop-stream',
+                    type: 'POST',
+                    data: {
+                        portal_id: portalId,
+                        channel_id: channelId
+                    },
+                    success: function(data) {
+                        showAlert('Stream stopped successfully', 'success');
+                        // Reload page to update list
+                        location.reload();
+                    },
+                    error: function() {
+                        showAlert('Failed to stop stream', 'danger');
+                    }
+                });
+            }
+        });
+    });
+</script>
+{% endblock %}

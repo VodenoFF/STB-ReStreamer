@@ -1,0 +1,723 @@
+{% extends "layout.html" %}
+
+{% block title %}Channel Preview - STB-ReStreamer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .channel-preview-container {
+        position: relative;
+        width: 100%;
+        background-color: #000;
+        margin-bottom: 20px;
+        border-radius: 5px;
+        overflow: hidden;
+    }
+    
+    .channel-preview {
+        width: 100%;
+        aspect-ratio: 16/9;
+        background-color: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+    }
+    
+    .preview-controls {
+        padding: 10px;
+        background-color: rgba(0, 0, 0, 0.7);
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: opacity 0.3s;
+        opacity: 0;
+    }
+    
+    .channel-preview-container:hover .preview-controls {
+        opacity: 1;
+    }
+    
+    .preview-placeholder {
+        width: 100%;
+        aspect-ratio: 16/9;
+        background-color: #343a40;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #adb5bd;
+        padding: 20px;
+        text-align: center;
+    }
+    
+    .preview-placeholder i {
+        font-size: 48px;
+        margin-bottom: 15px;
+    }
+    
+    .portal-selector {
+        margin-bottom: 20px;
+    }
+    
+    #channelList {
+        height: calc(100vh - 350px);
+        overflow-y: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+    }
+    
+    .channel-item {
+        padding: 10px 15px;
+        border-bottom: 1px solid #dee2e6;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    .channel-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .channel-item.active {
+        background-color: #e9ecef;
+        border-left: 3px solid #0d6efd;
+    }
+    
+    .channel-item .channel-number {
+        display: inline-block;
+        width: 30px;
+        font-weight: 500;
+        color: #6c757d;
+    }
+    
+    .channel-search {
+        margin-bottom: 15px;
+    }
+    
+    .channel-category {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-top: 5px;
+    }
+    
+    .channel-logo {
+        width: 24px;
+        height: 24px;
+        object-fit: contain;
+        margin-right: 10px;
+    }
+    
+    .no-channels {
+        padding: 20px;
+        text-align: center;
+        color: #6c757d;
+    }
+    
+    .preview-info {
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .preview-info h4 {
+        margin-top: 0;
+        margin-bottom: 15px;
+    }
+    
+    .preview-info .row {
+        margin-bottom: 10px;
+    }
+    
+    .preview-info .label {
+        font-weight: 500;
+    }
+    
+    .video-loader {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        text-align: center;
+    }
+    
+    .video-loader i {
+        font-size: 48px;
+        margin-bottom: 10px;
+        animation: spin 2s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block page_title %}Channel Preview{% endblock %}
+
+{% block page_actions %}
+<div>
+    <button id="refreshChannelsBtn" class="btn btn-outline-secondary">
+        <i class="fas fa-sync-alt"></i> Refresh Channels
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <!-- Preview Container -->
+        <div class="channel-preview-container">
+            <div id="previewPlaceholder" class="preview-placeholder">
+                <i class="fas fa-tv"></i>
+                <h4>No Channel Selected</h4>
+                <p>Select a channel from the list to preview it</p>
+            </div>
+            
+            <div id="videoLoader" class="video-loader d-none">
+                <i class="fas fa-spinner"></i>
+                <div>Loading stream...</div>
+            </div>
+            
+            <video id="channelPreview" class="channel-preview d-none" controls autoplay></video>
+            
+            <div class="preview-controls">
+                <button id="muteToggleBtn" class="btn btn-sm btn-dark">
+                    <i class="fas fa-volume-mute"></i>
+                </button>
+                <div>
+                    <button id="fullscreenBtn" class="btn btn-sm btn-dark">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Channel Info -->
+        <div id="channelInfo" class="preview-info d-none">
+            <h4>Channel Information</h4>
+            <div class="row">
+                <div class="col-md-3 label">Name:</div>
+                <div class="col-md-9" id="infoName">-</div>
+            </div>
+            <div class="row">
+                <div class="col-md-3 label">Number:</div>
+                <div class="col-md-9" id="infoNumber">-</div>
+            </div>
+            <div class="row">
+                <div class="col-md-3 label">Category:</div>
+                <div class="col-md-9" id="infoCategory">-</div>
+            </div>
+            <div class="row">
+                <div class="col-md-3 label">Portal:</div>
+                <div class="col-md-9" id="infoPortal">-</div>
+            </div>
+            <div class="row">
+                <div class="col-md-3 label">Stream URL:</div>
+                <div class="col-md-9">
+                    <button id="streamUrlBtn" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-link"></i> Get Stream URL
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Portal Selector -->
+        <div class="portal-selector">
+            <label for="portalSelect" class="form-label">Select Portal</label>
+            <select id="portalSelect" class="form-select">
+                <option value="">Loading portals...</option>
+            </select>
+        </div>
+        
+        <!-- Channel Search -->
+        <div class="channel-search">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-search"></i>
+                </span>
+                <input type="text" id="channelSearchInput" class="form-control" placeholder="Search channels...">
+            </div>
+        </div>
+        
+        <!-- Channel List -->
+        <div id="channelList">
+            <div class="no-channels">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Loading channels...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stream URL Modal -->
+<div class="modal fade" id="streamUrlModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Stream URL</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Use this URL to access the stream directly:</p>
+                <div class="input-group mb-3">
+                    <input type="text" id="streamUrlInput" class="form-control" readonly>
+                    <button class="btn btn-outline-secondary" type="button" id="copyStreamUrlBtn">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> This URL requires an active session and will expire after some time.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Elements
+        const portalSelect = document.getElementById('portalSelect');
+        const channelList = document.getElementById('channelList');
+        const channelSearchInput = document.getElementById('channelSearchInput');
+        const refreshChannelsBtn = document.getElementById('refreshChannelsBtn');
+        const previewPlaceholder = document.getElementById('previewPlaceholder');
+        const videoLoader = document.getElementById('videoLoader');
+        const channelPreview = document.getElementById('channelPreview');
+        const muteToggleBtn = document.getElementById('muteToggleBtn');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const channelInfo = document.getElementById('channelInfo');
+        const infoName = document.getElementById('infoName');
+        const infoNumber = document.getElementById('infoNumber');
+        const infoCategory = document.getElementById('infoCategory');
+        const infoPortal = document.getElementById('infoPortal');
+        const streamUrlBtn = document.getElementById('streamUrlBtn');
+        const streamUrlModal = new bootstrap.Modal(document.getElementById('streamUrlModal'));
+        const streamUrlInput = document.getElementById('streamUrlInput');
+        const copyStreamUrlBtn = document.getElementById('copyStreamUrlBtn');
+        
+        // State variables
+        let portals = [];
+        let channels = [];
+        let selectedChannel = null;
+        let hls = null;
+        
+        // Initialize HLS.js if supported
+        function initializePlayer() {
+            if (Hls.isSupported()) {
+                hls = new Hls({
+                    maxBufferLength: 30,
+                    maxMaxBufferLength: 60
+                });
+            } else if (channelPreview.canPlayType('application/vnd.apple.mpegurl')) {
+                // Native HLS support (Safari)
+                console.log('Using native HLS support');
+            } else {
+                showAlert('HLS playback is not supported in this browser', 'warning');
+            }
+        }
+        
+        // Initialize the player
+        initializePlayer();
+        
+        // Load portals
+        function loadPortals() {
+            fetch('/api/portals')
+                .then(response => response.json())
+                .then(data => {
+                    portals = data.portals.filter(portal => portal.enabled);
+                    
+                    // Clear options
+                    portalSelect.innerHTML = '';
+                    
+                    // Add default option
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = '';
+                    defaultOption.textContent = 'Select a portal...';
+                    portalSelect.appendChild(defaultOption);
+                    
+                    // Add portal options
+                    portals.forEach(portal => {
+                        const option = document.createElement('option');
+                        option.value = portal.id;
+                        option.textContent = portal.name;
+                        portalSelect.appendChild(option);
+                    });
+                    
+                    // Select first portal if available
+                    if (portals.length > 0) {
+                        portalSelect.value = portals[0].id;
+                        loadChannels(portals[0].id);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading portals:', error);
+                    showAlert('Failed to load portals', 'danger');
+                });
+        }
+        
+        // Load channels for a portal
+        function loadChannels(portalId) {
+            if (!portalId) {
+                channelList.innerHTML = `
+                    <div class="no-channels">
+                        <p>Select a portal to view channels</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Show loading
+            channelList.innerHTML = `
+                <div class="no-channels">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading channels...</p>
+                </div>
+            `;
+            
+            // Find MAC address for the selected portal
+            const portal = portals.find(p => p.id === portalId);
+            const mac = portal ? portal.mac : '';
+            
+            fetch(`/api/channels/${portalId}/${mac}`)
+                .then(response => response.json())
+                .then(data => {
+                    channels = data.channels || [];
+                    
+                    if (channels.length === 0) {
+                        channelList.innerHTML = `
+                            <div class="no-channels">
+                                <p>No channels found for this portal</p>
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    // Sort channels by number
+                    channels.sort((a, b) => {
+                        const numA = parseInt(a.number) || 0;
+                        const numB = parseInt(b.number) || 0;
+                        return numA - numB;
+                    });
+                    
+                    // Render channel list
+                    renderChannelList(channels);
+                })
+                .catch(error => {
+                    console.error('Error loading channels:', error);
+                    showAlert('Failed to load channels', 'danger');
+                    
+                    channelList.innerHTML = `
+                        <div class="no-channels">
+                            <p>Error loading channels</p>
+                        </div>
+                    `;
+                });
+        }
+        
+        // Render channel list
+        function renderChannelList(channelsToRender) {
+            // Clear list
+            channelList.innerHTML = '';
+            
+            if (channelsToRender.length === 0) {
+                channelList.innerHTML = `
+                    <div class="no-channels">
+                        <p>No channels found</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Add channels
+            channelsToRender.forEach(channel => {
+                const item = document.createElement('div');
+                item.className = 'channel-item';
+                item.dataset.id = channel.id;
+                
+                let logoHtml = '';
+                if (channel.logo) {
+                    logoHtml = `<img src="${channel.logo}" class="channel-logo" alt="${channel.name}" onerror="this.style.display='none'">`;
+                }
+                
+                item.innerHTML = `
+                    <div>
+                        <span class="channel-number">${channel.number || '-'}</span>
+                        ${logoHtml}
+                        <span>${channel.name}</span>
+                    </div>
+                    <div class="channel-category">${channel.category || 'Uncategorized'}</div>
+                `;
+                
+                // Click event to preview channel
+                item.addEventListener('click', () => {
+                    // Clear active class from all channels
+                    document.querySelectorAll('.channel-item').forEach(el => {
+                        el.classList.remove('active');
+                    });
+                    
+                    // Add active class to selected channel
+                    item.classList.add('active');
+                    
+                    // Set selected channel
+                    selectedChannel = channel;
+                    
+                    // Update channel info
+                    updateChannelInfo(channel);
+                    
+                    // Start preview
+                    previewChannel(channel);
+                });
+                
+                channelList.appendChild(item);
+            });
+        }
+        
+        // Update channel info display
+        function updateChannelInfo(channel) {
+            // Show channel info
+            channelInfo.classList.remove('d-none');
+            
+            // Update info
+            infoName.textContent = channel.name || '-';
+            infoNumber.textContent = channel.number || '-';
+            infoCategory.textContent = channel.category || 'Uncategorized';
+            
+            // Find portal name
+            const portal = portals.find(p => p.id === portalSelect.value);
+            infoPortal.textContent = portal ? portal.name : '-';
+        }
+        
+        // Preview channel
+        function previewChannel(channel) {
+            // Hide placeholder and show loader
+            previewPlaceholder.classList.add('d-none');
+            videoLoader.classList.remove('d-none');
+            channelPreview.classList.add('d-none');
+            
+            // Get portal and MAC
+            const portalId = portalSelect.value;
+            const portal = portals.find(p => p.id === portalId);
+            const mac = portal ? portal.mac : '';
+            
+            if (!portalId || !mac || !channel.id) {
+                showAlert('Missing required information for preview', 'danger');
+                return;
+            }
+            
+            // Get stream URL
+            const previewUrl = `/preview/${portalId}/${mac}/${channel.id}`;
+            
+            // Load the stream
+            loadStream(previewUrl);
+        }
+        
+        // Load a stream
+        function loadStream(url) {
+            // Cleanup previous stream
+            if (hls && hls.media) {
+                hls.destroy();
+                initializePlayer();
+            }
+            
+            // Load with HLS.js if supported
+            if (Hls.isSupported()) {
+                hls.attachMedia(channelPreview);
+                hls.on(Hls.Events.MEDIA_ATTACHED, function() {
+                    hls.loadSource(url);
+                    hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                        // Show video and hide loader
+                        videoLoader.classList.add('d-none');
+                        channelPreview.classList.remove('d-none');
+                        channelPreview.play().catch(e => {
+                            console.warn('Autoplay failed:', e);
+                            // Try muting and playing
+                            channelPreview.muted = true;
+                            muteToggleBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+                            channelPreview.play().catch(e => {
+                                console.error('Autoplay failed even when muted:', e);
+                                showAlert('Autoplay failed. Please click play manually.', 'warning');
+                            });
+                        });
+                    });
+                    
+                    hls.on(Hls.Events.ERROR, function(event, data) {
+                        if (data.fatal) {
+                            switch(data.type) {
+                                case Hls.ErrorTypes.NETWORK_ERROR:
+                                    console.error('Network error:', data);
+                                    showAlert('Network error: Failed to load stream', 'danger');
+                                    resetPlayer();
+                                    break;
+                                case Hls.ErrorTypes.MEDIA_ERROR:
+                                    console.error('Media error:', data);
+                                    showAlert('Media error: Stream cannot be played', 'danger');
+                                    resetPlayer();
+                                    break;
+                                default:
+                                    console.error('Fatal error:', data);
+                                    showAlert('Fatal error: Stream playback failed', 'danger');
+                                    resetPlayer();
+                                    break;
+                            }
+                        }
+                    });
+                });
+            } else if (channelPreview.canPlayType('application/vnd.apple.mpegurl')) {
+                // Native HLS support (Safari)
+                channelPreview.src = url;
+                channelPreview.addEventListener('loadedmetadata', function() {
+                    // Show video and hide loader
+                    videoLoader.classList.add('d-none');
+                    channelPreview.classList.remove('d-none');
+                    channelPreview.play().catch(e => {
+                        console.warn('Autoplay failed:', e);
+                        channelPreview.muted = true;
+                        muteToggleBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+                        channelPreview.play();
+                    });
+                });
+                channelPreview.addEventListener('error', function() {
+                    console.error('Video error:', channelPreview.error);
+                    showAlert('Error: Stream cannot be played', 'danger');
+                    resetPlayer();
+                });
+            } else {
+                showAlert('Your browser does not support HLS playback', 'danger');
+                resetPlayer();
+            }
+        }
+        
+        // Reset player to placeholder
+        function resetPlayer() {
+            // Hide video and loader, show placeholder
+            channelPreview.classList.add('d-none');
+            videoLoader.classList.add('d-none');
+            previewPlaceholder.classList.remove('d-none');
+            
+            // Cleanup HLS
+            if (hls && hls.media) {
+                hls.destroy();
+                initializePlayer();
+            }
+            
+            // Hide channel info
+            channelInfo.classList.add('d-none');
+        }
+        
+        // Filter channels by search term
+        function filterChannels(searchTerm) {
+            if (!searchTerm || searchTerm.trim() === '') {
+                renderChannelList(channels);
+                return;
+            }
+            
+            searchTerm = searchTerm.toLowerCase().trim();
+            
+            const filtered = channels.filter(channel => {
+                return (
+                    (channel.name && channel.name.toLowerCase().includes(searchTerm)) ||
+                    (channel.number && channel.number.toString().includes(searchTerm)) ||
+                    (channel.category && channel.category.toLowerCase().includes(searchTerm))
+                );
+            });
+            
+            renderChannelList(filtered);
+        }
+        
+        // Event: Portal selection change
+        portalSelect.addEventListener('change', function() {
+            // Reset player
+            resetPlayer();
+            selectedChannel = null;
+            
+            // Load channels for selected portal
+            loadChannels(this.value);
+        });
+        
+        // Event: Channel search
+        channelSearchInput.addEventListener('input', function() {
+            filterChannels(this.value);
+        });
+        
+        // Event: Refresh channels
+        refreshChannelsBtn.addEventListener('click', function() {
+            // Reset player
+            resetPlayer();
+            selectedChannel = null;
+            
+            // Reload channels
+            loadChannels(portalSelect.value);
+            showAlert('Channel list refreshed', 'success');
+        });
+        
+        // Event: Mute toggle
+        muteToggleBtn.addEventListener('click', function() {
+            if (channelPreview.muted) {
+                channelPreview.muted = false;
+                this.innerHTML = '<i class="fas fa-volume-up"></i>';
+            } else {
+                channelPreview.muted = true;
+                this.innerHTML = '<i class="fas fa-volume-mute"></i>';
+            }
+        });
+        
+        // Event: Fullscreen
+        fullscreenBtn.addEventListener('click', function() {
+            if (channelPreview.requestFullscreen) {
+                channelPreview.requestFullscreen();
+            } else if (channelPreview.webkitRequestFullscreen) {
+                channelPreview.webkitRequestFullscreen();
+            } else if (channelPreview.msRequestFullscreen) {
+                channelPreview.msRequestFullscreen();
+            }
+        });
+        
+        // Event: Get stream URL
+        streamUrlBtn.addEventListener('click', function() {
+            if (!selectedChannel) return;
+            
+            const portalId = portalSelect.value;
+            const portal = portals.find(p => p.id === portalId);
+            const mac = portal ? portal.mac : '';
+            
+            if (!portalId || !mac || !selectedChannel.id) {
+                showAlert('Missing required information for stream URL', 'danger');
+                return;
+            }
+            
+            // Build stream URL
+            const streamUrl = `${window.location.origin}/stream/${portalId}/${mac}/${selectedChannel.id}`;
+            
+            // Set in modal
+            streamUrlInput.value = streamUrl;
+            
+            // Show modal
+            streamUrlModal.show();
+        });
+        
+        // Event: Copy stream URL
+        copyStreamUrlBtn.addEventListener('click', function() {
+            streamUrlInput.select();
+            document.execCommand('copy');
+            showAlert('Stream URL copied to clipboard', 'success');
+        });
+        
+        // Load portals on page load
+        loadPortals();
+    });
+</script>
+{% endblock %} 
