@@ -20,7 +20,6 @@ from flask import (
 )
 import stb
 import waitress
-import xml.etree.cElementTree as ET
 from werkzeug.utils import secure_filename
 from collections import OrderedDict
 from threading import Lock
@@ -182,14 +181,18 @@ app.secret_key = secrets.token_urlsafe(32) # Secret key for Flask sessions and C
 
 #region Logging Configuration
 
+# Configure logging to handle Unicode properly
+import sys
+
+# Create logger
 logger = logging.getLogger("STB-Proxy")
-logger.setLevel(logging.INFO) # Set logging level to INFO
+logger.setLevel(logging.INFO)
 
 # Define log format
 logFormat = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 
-# File handler for logging to STB-Proxy.log
-fileHandler = logging.FileHandler("STB-Proxy.log")
+# File handler for logging to STB-Proxy.log with UTF-8 encoding
+fileHandler = logging.FileHandler("STB-Proxy.log", encoding='utf-8')
 fileHandler.setFormatter(logFormat)
 logger.addHandler(fileHandler)
 
@@ -198,6 +201,21 @@ consoleFormat = logging.Formatter("[%(levelname)s] %(message)s")
 consoleHandler = logging.StreamHandler()
 consoleHandler.setFormatter(consoleFormat)
 logger.addHandler(consoleHandler)
+
+# Create a custom filter to handle Unicode characters
+class UnicodeFilter(logging.Filter):
+    def filter(self, record):
+        if isinstance(record.msg, str):
+            # Replace any problematic characters with their Unicode escape sequences
+            try:
+                record.msg.encode('cp1252')
+            except UnicodeEncodeError:
+                record.msg = record.msg.encode('utf-8', 'replace').decode('utf-8')
+        return True
+
+# Add the filter to both handlers
+fileHandler.addFilter(UnicodeFilter())
+consoleHandler.addFilter(UnicodeFilter())
 
 #endregion
 
@@ -216,9 +234,6 @@ alerts_file = os.path.join(basePath, "alerts.json") # Path to the alerts file
 
 occupied = {} # Dictionary to track occupied MAC addresses and streaming clients. {portalId: [{mac, channel_id, channel_name, client, portal_name, start_time}, ...]}
 config = {} # Global config dictionary, loaded from config.json
-portalsdata = {} # Not used currently? Consider removing if unused.
-portalmacids = {} # Not used currently? Consider removing if unused.
-d_ffmpegcmd = "ffmpeg -re -http_proxy <proxy> -timeout <timeout> -i <url> -map 0 -codec copy -f mpegts pipe:" # Default ffmpeg command template
 
 # Default settings dictionary. Used when creating a new config file or when a setting is missing.
 defaultSettings = {
@@ -269,7 +284,7 @@ def get_ffmpeg_path():
             result = subprocess.run(['where', 'ffmpeg'], capture_output=True, text=True)
             if result.returncode == 0:
                 return 'ffmpeg'  # ffmpeg is in PATH
-            
+
             # Check common Windows install locations
             common_paths = [
                 os.path.join(os.environ.get('ProgramFiles', ''), 'ffmpeg', 'bin', 'ffmpeg.exe'),
@@ -282,7 +297,7 @@ def get_ffmpeg_path():
             result = subprocess.run(['which', 'ffmpeg'], capture_output=True, text=True)
             if result.returncode == 0:
                 return 'ffmpeg'  # ffmpeg is in PATH
-            
+
             # Check common Unix install locations
             common_paths = [
                 '/usr/bin/ffmpeg',
@@ -300,8 +315,51 @@ def get_ffmpeg_path():
 
     return 'ffmpeg'  # Default to just the command name
 
+def get_ffprobe_path():
+    """
+    Get the path to the ffprobe executable, checking common locations.
+    Returns the full path if found, or just 'ffprobe' if not found in common locations.
+    """
+    # Check if ffprobe is in the system path
+    try:
+        if os.name == 'nt':  # Windows
+            result = subprocess.run(['where', 'ffprobe'], capture_output=True, text=True)
+            if result.returncode == 0:
+                return 'ffprobe'  # ffprobe is in PATH
+
+            # Check common Windows install locations
+            common_paths = [
+                os.path.join(os.environ.get('ProgramFiles', ''), 'ffmpeg', 'bin', 'ffprobe.exe'),
+                os.path.join(os.environ.get('ProgramFiles(x86)', ''), 'ffmpeg', 'bin', 'ffprobe.exe'),
+                os.path.join(basePath, 'ffmpeg', 'bin', 'ffprobe.exe'),  # Local to the application
+                os.path.join(basePath, 'ffprobe.exe'),  # Direct in application directory
+                r'C:\ffmpeg\bin\ffprobe.exe',  # Common Windows installation path
+            ]
+        else:  # Linux/Unix
+            result = subprocess.run(['which', 'ffprobe'], capture_output=True, text=True)
+            if result.returncode == 0:
+                return 'ffprobe'  # ffprobe is in PATH
+
+            # Check common Unix install locations
+            common_paths = [
+                '/usr/bin/ffprobe',
+                '/usr/local/bin/ffprobe',
+                os.path.join(basePath, 'ffprobe'),  # Local to the application
+            ]
+
+        # Check each path
+        for path in common_paths:
+            if os.path.isfile(path):
+                return path
+
+    except Exception as e:
+        logger.error(f"Error checking ffprobe path: {e}")
+
+    return 'ffprobe'  # Default to just the command name
+
 # Add to the global variables section
 ffmpeg_path = get_ffmpeg_path()  # Get ffmpeg path once at startup
+ffprobe_path = get_ffprobe_path()  # Get ffprobe path once at startup
 
 #endregion
 
@@ -310,6 +368,7 @@ ffmpeg_path = get_ffmpeg_path()  # Get ffmpeg path once at startup
 def load_alerts():
     """
     Loads alerts from alerts.json file.
+    Creates the file with an empty list if it doesn't exist.
 
     Returns:
         list: List of alert dictionaries.
@@ -318,7 +377,18 @@ def load_alerts():
         with open(alerts_file) as f:
             return json.load(f)
     except FileNotFoundError:
-        return [] # Return empty list if file not found
+        # Create directory if it doesn't exist
+        directory = os.path.dirname(alerts_file)
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory)
+            logger.info(f"Created directory: {directory}")
+
+        # Create empty alerts file
+        with open(alerts_file, "w") as f:
+            json.dump([], f)
+            logger.info(f"Created empty alerts file: {alerts_file}")
+
+        return [] # Return empty list
 
 def save_alerts(alerts):
     """
@@ -333,6 +403,7 @@ def save_alerts(alerts):
 def add_alert(alert_type, source, message, status="active"):
     """
     Adds a new alert to the alerts.json file.
+    Alerts are sorted only by date (newest to oldest) when displayed.
 
     Args:
         alert_type (str): Type of alert (e.g., "error", "warning").
@@ -351,6 +422,7 @@ def add_alert(alert_type, source, message, status="active"):
         "message": message,
         "status": status
     }
+    # Add the alert to the list (will be sorted by timestamp when displayed)
     alerts.append(alert)
     save_alerts(alerts)
     return alert
@@ -362,12 +434,19 @@ def add_alert(alert_type, source, message, status="active"):
 def save_json(file_path, data, message):
     """
     Saves data to a JSON file and prints a message to the console.
+    Creates the directory if it doesn't exist.
 
     Args:
         file_path (str): Path to the JSON file.
         data (dict or list): Data to be saved as JSON.
         message (str): Message to print to the console after saving.
     """
+    # Create directory if it doesn't exist
+    directory = os.path.dirname(file_path)
+    if directory and not os.path.exists(directory):
+        os.makedirs(directory)
+        logger.info(f"Created directory: {directory}")
+
     with open(file_path, "w") as f:
         json.dump(data, f, indent=4) # Save with indentation for readability
         print(message)
@@ -387,6 +466,7 @@ def savePortalData(name, allChannels, allGenre):
 def loadConfig():
     """
     Loads configuration from config.json file. Creates a new config file with defaults if not found.
+    Creates the directory if it doesn't exist.
 
     Returns:
         dict: Configuration dictionary.
@@ -396,6 +476,13 @@ def loadConfig():
             data = json.load(f) # Load JSON data from config file
     except FileNotFoundError:
         logger.warning("No existing config found. Creating a new one")
+
+        # Create directory if it doesn't exist
+        directory = os.path.dirname(configFile)
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory)
+            logger.info(f"Created directory: {directory}")
+
         data = {} # Initialize empty config if file not found
 
     # Ensure 'portals' and 'settings' keys exist in the config, initialize with empty dict if not
@@ -522,8 +609,8 @@ def saveChannelGroups(channel_groups):
     Args:
         channel_groups (dict): Dictionary of channel groups to save.
     """
-    with open(os.path.join(basePath, "channel_groups.json"), "w") as f:
-        json.dump(channel_groups, f, indent=4) # Save with indentation for readability
+    file_path = os.path.join(basePath, "channel_groups.json")
+    save_json(file_path, channel_groups, "Channel groups saved") # Use save_json to ensure directory exists
 
 #endregion
 
@@ -1100,6 +1187,47 @@ def groups_playlist():
 
 #region Route Handlers - Stream Playback
 
+@app.route("/player/<portalId>/<channelId>", methods=["GET"])
+def player_page(portalId, channelId):
+    """
+    Renders a dedicated player page for a channel.
+    This is used in the iframe and for opening in a new tab.
+    """
+    # Get portal and channel information
+    portals = getPortals()
+    if portalId not in portals:
+        return make_response(f"Portal {portalId} not found", 404)
+
+    portalName = portals[portalId].get("name", "Unknown Portal")
+
+    # Get channel name
+    channelName = "Channel"
+    customChannelNames = portals[portalId].get("custom channel names", {})
+    if channelId in customChannelNames:
+        channelName = customChannelNames[channelId]
+    else:
+        # Try to get the channel name from the channel list
+        try:
+            parent_folder = os.path.join(basePath, "channels")
+            name_path = os.path.join(parent_folder, f"{portalName}.json")
+            with open(name_path, 'r') as file:
+                channels = json.load(file)
+                for channel in channels:
+                    if str(channel.get("id")) == channelId:
+                        channelName = channel.get("name", "Channel")
+                        break
+        except Exception as e:
+            logger.error(f"Error getting channel name: {e}")
+
+    # Create the stream URL
+    stream_url = f"/play/{portalId}/{channelId}?web=true"
+
+    # Render the player template
+    return render_template("player.html",
+                           channel_name=channelName,
+                           stream_url=stream_url,
+                           portal_name=portalName)
+
 @app.route("/play/<portalId>/<channelId>", methods=["GET"])
 def channel(portalId, channelId):
     """
@@ -1129,15 +1257,28 @@ def channel(portalId, channelId):
             """
             Unoccupies a MAC address after streaming is finished. Removes entry from 'occupied' dictionary.
             """
-            occupied[portalId].remove({
-                "mac": mac,
-                "channel id": channelId,
-                "channel name": channelName,
-                "client": ip,
-                "portal name": portalName,
-                "start time": startTime,
-            })
-            logger.info(f"Unoccupied Portal({portalId}):MAC({mac})")
+            try:
+                # Check if the portal ID exists in the occupied dictionary
+                if portalId in occupied:
+                    entry_to_remove = {
+                        "mac": mac,
+                        "channel id": channelId,
+                        "channel name": channelName,
+                        "client": ip,
+                        "portal name": portalName,
+                        "start time": startTime,
+                    }
+
+                    # Check if the entry exists before trying to remove it
+                    if entry_to_remove in occupied[portalId]:
+                        occupied[portalId].remove(entry_to_remove)
+                        logger.info(f"Unoccupied Portal({portalId}):MAC({mac})")
+                    else:
+                        logger.warning(f"Entry for Portal({portalId}):MAC({mac}) not found in occupied list")
+                else:
+                    logger.warning(f"Portal({portalId}) not found in occupied dictionary")
+            except Exception as e:
+                logger.error(f"Error in unoccupy: {str(e)}")
 
         try:
             startTime = datetime.now(timezone.utc).timestamp()
@@ -1158,11 +1299,36 @@ def channel(portalId, channelId):
                     chunk = ffmpeg_sp.stdout.read(1024)
                     if not chunk:
                         if ffmpeg_sp.poll() != 0:
-                            stderr_output = ffmpeg_sp.stderr.read().decode('utf-8')
+                            stderr_output = ffmpeg_sp.stderr.read().decode('utf-8', errors='replace')
+                            error_code = ffmpeg_sp.poll()
+
+                            # Extract more meaningful error information
+                            error_message = "Unknown error"
+                            if "Connection refused" in stderr_output:
+                                error_message = "Connection refused by server"
+                            elif "Connection timed out" in stderr_output:
+                                error_message = "Connection timed out"
+                            elif "404 Not Found" in stderr_output:
+                                error_message = "Stream not found (404)"
+                            elif "403 Forbidden" in stderr_output:
+                                error_message = "Access forbidden (403)"
+                            elif "401 Unauthorized" in stderr_output:
+                                error_message = "Authentication required (401)"
+                            elif "No such file or directory" in stderr_output:
+                                error_message = "Stream URL is invalid"
+                            elif "Invalid data found" in stderr_output:
+                                error_message = "Invalid stream data format"
+                            elif "Server returned 5XX" in stderr_output:
+                                error_message = "Server error (5XX)"
+
                             logger.error(f"Ffmpeg error output: {stderr_output}")
-                            logger.error(f"Ffmpeg closed with error({ffmpeg_sp.poll()}). Moving MAC({mac}) for Portal({portalName})")
-                            add_alert("error", f"Portal: {portalName}", 
-                                    f"Stream failed for channel {channelName} (ID: {channelId}). Moving MAC {mac}. Error: {stderr_output}")
+                            logger.error(f"Ffmpeg closed with error({error_code}): {error_message}. Moving MAC({mac}) for Portal({portalName})")
+
+                            # Add detailed alert
+                            add_alert("error", f"Portal: {portalName}",
+                                    f"Stream failed for channel {channelName} (ID: {channelId}). Error: {error_message}. Moving MAC {mac}.")
+
+                            # Move MAC to the end of the list
                             moveMac(portalId, mac)
                         break
                     yield chunk
@@ -1186,7 +1352,7 @@ def channel(portalId, channelId):
         """
         timeout = int(getSettings().get("ffmpeg timeout")) * 1000000 # Get timeout from settings and convert to microseconds
         ffprobecmd = [
-            "ffprobe",
+            ffprobe_path,  # Use the full path to ffprobe
             "-v", "info",  # Show more info for debugging
             "-select_streams", "v:0",  # Select the first video stream
             "-show_entries", "stream=codec_name",  # Show codec name
@@ -1199,20 +1365,53 @@ def channel(portalId, channelId):
             ffprobecmd.extend(["-http_proxy", proxy]) # Add proxy to ffprobe command if configured
 
         try:
+            logger.info(f"Testing stream with command: {' '.join(ffprobecmd)}")
             with subprocess.Popen(
                 ffprobecmd,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
             ) as ffprobe_sb: # Start ffprobe process
                 stdout, stderr = ffprobe_sb.communicate() # Wait for ffprobe to finish and get output
                 result = ffprobe_sb.returncode == 0 and stdout.strip() != b'' # Check if ffprobe exited successfully and produced output
                 if not result:
-                    add_alert("error", f"Portal: {portalName}", f"Stream test failed for channel {channelName} (ID: {channelId})") # Add alert if test failed
+                    stderr_output = stderr.decode('utf-8', errors='replace')
+
+                    # Extract more meaningful error information
+                    error_message = "Unknown error"
+                    if "Connection refused" in stderr_output:
+                        error_message = "Connection refused by server"
+                    elif "Connection timed out" in stderr_output:
+                        error_message = "Connection timed out"
+                    elif "404 Not Found" in stderr_output:
+                        error_message = "Stream not found (404)"
+                    elif "403 Forbidden" in stderr_output:
+                        error_message = "Access forbidden (403)"
+                    elif "401 Unauthorized" in stderr_output:
+                        error_message = "Authentication required (401)"
+                    elif "No such file or directory" in stderr_output:
+                        error_message = "Stream URL is invalid"
+                    elif "Invalid data found" in stderr_output:
+                        error_message = "Invalid stream data format"
+                    elif "Server returned 5XX" in stderr_output:
+                        error_message = "Server error (5XX)"
+
+                    logger.error(f"Stream test failed: {stderr_output}")
+                    logger.error(f"Stream test error: {error_message} for channel {channelName} (ID: {channelId})")
+
+                    # Add detailed alert
+                    add_alert("error", f"Portal: {portalName}",
+                             f"Stream test failed for channel {channelName} (ID: {channelId}). Error: {error_message}")
+
                 return result # Return test result (True/False)
+        except FileNotFoundError:
+            logger.error(f"FFprobe not found at path: {ffprobe_path}")
+            add_alert("error", "System", "FFprobe not found. Please install FFmpeg and make sure it's in the system PATH")
+            return False
         except Exception as e:
             logger.error(f"Exception during stream test: {e}")
-            add_alert("error", f"Portal: {portalName}", f"Stream test encountered an error for channel {channelName} (ID: {channelId})") # Add alert for exception during test
+            add_alert("error", f"Portal: {portalName}", f"Stream test encountered an error for channel {channelName} (ID: {channelId}): {str(e)}") # Add alert for exception during test
             return False # Return False if exception occurred
 
     def isMacFree():
@@ -1370,7 +1569,7 @@ def channel(portalId, channelId):
 
                 if web: # Web preview mode
                     ffmpegcmd = [
-                        "ffmpeg",
+                        ffmpeg_path,  # Use the full path to ffmpeg
                         "-loglevel",
                         "panic",
                         "-hide_banner",
@@ -1741,7 +1940,7 @@ def get_group(group_name):
         # Get portals information to include in the response
         portals = getPortals()
         return jsonify({
-            "status": "success", 
+            "status": "success",
             "channels": channel_groups[group_name]["channels"],
             "portals": portals
         }) # Return channels in group and portal data as JSON
@@ -2010,7 +2209,7 @@ def get_groups():
     """
     channel_groups = getChannelGroups()
     group_list = []
-    
+
     for group_id, group_data in channel_groups.items():
         group_info = {
             "id": group_id,
@@ -2018,13 +2217,13 @@ def get_groups():
             "icon": group_data.get("icon", "bi-collection-fill"),
             "channels": []
         }
-        
+
         # Add the channel count directly
         channels = group_data.get("channels", [])
         group_info["channels"] = len(channels)
-        
+
         group_list.append(group_info)
-    
+
     return jsonify(group_list)
 
 @app.route("/group/<group_id>/channels", methods=["GET"])
@@ -2034,13 +2233,13 @@ def get_group_channels(group_id):
     API endpoint to get channels in a specific group.
     """
     channel_groups = getChannelGroups()
-    
+
     if group_id not in channel_groups:
         return jsonify([])
-    
+
     group_data = channel_groups[group_id]
     channel_list = []
-    
+
     if "channels" in group_data:
         for idx, channel in enumerate(group_data["channels"]):
             channel_info = {
@@ -2051,7 +2250,7 @@ def get_group_channels(group_id):
                 "position": idx
             }
             channel_list.append(channel_info)
-    
+
     return jsonify(channel_list)
 
 @app.route("/alerts", methods=["GET"])
@@ -2059,8 +2258,15 @@ def get_group_channels(group_id):
 def alerts():
     """
     Renders the alerts page (alerts.html) with current alerts.
+    Alerts are sorted only by date, from newest to oldest.
     """
-    return render_template("alerts.html", alerts=load_alerts()) # Render alerts template with alert data
+    alerts_list = load_alerts()
+
+    # Sort alerts by timestamp, newest first
+    from datetime import datetime
+    alerts_list.sort(key=lambda x: datetime.strptime(x['timestamp'], "%Y-%m-%d %H:%M:%S"), reverse=True)
+
+    return render_template("alerts.html", alerts=alerts_list) # Render alerts template with alerts sorted by date
 
 @app.route("/alerts/unresolved/count", methods=["GET"])
 @authorise
@@ -2087,12 +2293,23 @@ def resolve_alert():
 
         alerts = load_alerts() # Load alerts
 
-        if alert_id >= len(alerts):
+        # Sort alerts by timestamp, newest first (same as in the alerts route)
+        from datetime import datetime
+        sorted_alerts = sorted(alerts, key=lambda x: datetime.strptime(x['timestamp'], "%Y-%m-%d %H:%M:%S"), reverse=True)
+
+        if alert_id >= len(sorted_alerts):
             return jsonify({"success": False, "error": "Invalid alert ID"}), 404 # Return error status if invalid alert ID
 
-        # Update alert status
-        alerts[alert_id]["status"] = "resolved" # Set alert status to resolved
-        alerts[alert_id]["resolved_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # Record resolve timestamp
+        # Find the alert in the original list that matches the sorted alert
+        target_alert = sorted_alerts[alert_id]
+        for i, alert in enumerate(alerts):
+            if (alert['timestamp'] == target_alert['timestamp'] and
+                alert['type'] == target_alert['type'] and
+                alert['message'] == target_alert['message']):
+                # Update alert status
+                alerts[i]["status"] = "resolved" # Set alert status to resolved
+                alerts[i]["resolved_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # Record resolve timestamp
+                break
 
         # Save updated alerts
         save_alerts(alerts) # Save updated alerts
@@ -2106,20 +2323,7 @@ def resolve_alert():
 
 #region Background Tasks (Currently Empty)
 
-# Add error handling for non-working channels (currently a placeholder function)
-def check_channel_status(url, mac, token, proxy):
-    """
-    Placeholder function for checking channel status (currently does not perform actual checks).
-    """
-    try:
-        response = stb.make_request(url, proxy) # Placeholder request
-        if not response or response.status_code != 200: # Placeholder check
-            add_alert("error", "Channel Check", f"Channel not responding: {url}") # Placeholder alert
-            return False
-        return True
-    except Exception as e:
-        add_alert("error", "Channel Check", f"Error checking channel {url}: {str(e)}") # Placeholder alert
-        return False
+# This region is reserved for future background tasks
 
 #endregion
 
@@ -2133,231 +2337,3 @@ if __name__ == "__main__":
         waitress.serve(app, port=8001, _quiet=True, threads=12) # Run using Waitress WSGI server in production mode
 
 #endregion
-
-@app.route("/channels/add_channel", methods=["POST"])
-@authorise
-def add_channel():
-    """
-    Adapter API endpoint to add a single channel to a channel group.
-    Converts the new API format to the old one.
-    """
-    data = request.get_json() # Get JSON data from request
-    group_name = data.get("group") # Get group name from JSON data
-    portal_id = data.get("portal") # Get portal ID from JSON data
-    channel_id = data.get("channel") # Get channel ID from JSON data
-    
-    # Adapt format for the older add_channels endpoint
-    adapted_data = {
-        "group_name": group_name,
-        "portal": portal_id,
-        "channels": channel_id
-    }
-    
-    # Call the original add_channels function (from line 1750)
-    # We need to modify the request context
-    with app.test_request_context(
-        '/channels/add_channels', 
-        method='POST',
-        json=adapted_data
-    ) as ctx:
-        # Process the request
-        response = add_channels()
-        
-        # Convert the response status field to success field
-        if isinstance(response, tuple):
-            data, status_code = response
-            return response
-        
-        data = response.get_json()
-        if data.get("status") == "success":
-            return jsonify({"success": True})
-        else:
-            return jsonify({"success": False, "message": data.get("message", "Unknown error")}), 400
-
-@app.route("/channels/move_channel", methods=["POST"])
-@authorise
-def move_channel():
-    """
-    API endpoint to move a channel up or down in a group.
-    Uses the channel reorder endpoint to achieve the same functionality.
-    """
-    data = request.get_json() # Get JSON data from request
-    group_name = data.get("group") # Get group name from JSON data
-    index = data.get("index") # Get channel index
-    direction = data.get("direction") # Get move direction (up/down)
-
-    if not all([group_name, index is not None, direction]):
-        return jsonify({"success": False, "message": "Missing required parameters"}), 400
-
-    channel_groups = getChannelGroups()
-    if group_name not in channel_groups:
-        return jsonify({"success": False, "message": "Group not found"}), 404
-
-    channels = channel_groups[group_name]["channels"]
-    if not channels or index < 0 or index >= len(channels):
-        return jsonify({"success": False, "message": "Invalid channel index"}), 400
-
-    # Move channel up or down based on direction
-    if direction == "up" and index > 0:
-        channels[index], channels[index-1] = channels[index-1], channels[index]
-    elif direction == "down" and index < len(channels) - 1:
-        channels[index], channels[index+1] = channels[index+1], channels[index]
-    else:
-        return jsonify({"success": False, "message": "Cannot move channel in that direction"}), 400
-
-    # Call the reorder endpoint with the modified channels list
-    with app.test_request_context(
-        '/channels/reorder', 
-        method='POST',
-        json={
-            "group_name": group_name,
-            "channels": channels
-        }
-    ) as ctx:
-        # Process the request
-        response = reorder_channels()
-        
-        # Convert the response status field to success field
-        if isinstance(response, tuple):
-            return jsonify({"success": False, "message": "Reordering failed"}), 400
-        
-        data = response.get_json()
-        if data.get("status") == "success":
-            return jsonify({"success": True})
-        else:
-            return jsonify({"success": False, "message": data.get("message", "Unknown error")}), 400
-
-@app.route("/channels/create_group", methods=["POST"])
-@authorise
-def create_group_alt():
-    """
-    Adapter API endpoint to create a new channel group.
-    Converts the new API format to the old one.
-    """
-    data = request.get_json() # Get JSON data from request
-    group_name = data.get("group") # Get group name from JSON data
-
-    # Call the original create_group function with adapted data
-    with app.test_request_context(
-        '/channels/create', 
-        method='POST',
-        json={"group_name": group_name}
-    ) as ctx:
-        # Process the request
-        response = create_group()
-        
-        # Convert the response status field to success field
-        if isinstance(response, tuple):
-            return jsonify({"success": False, "message": "Group creation failed"}), 400
-        
-        data = response.get_json()
-        if data.get("status") == "success":
-            return jsonify({"success": True})
-        else:
-            return jsonify({"success": False, "message": data.get("message", "Unknown error")}), 400
-
-@app.route("/channels/reorder_channels", methods=["POST"])
-@authorise
-def reorder_channels_new():
-    """
-    Adapter API endpoint to reorder channels within a channel group using indexes.
-    Converts the new API format to the old one.
-    """
-    data = request.get_json() # Get JSON data from request
-    group_name = data.get("group") # Get group name from JSON data
-    indexes = data.get("indexes", []) # Get channel indexes in new order
-
-    if not group_name or not indexes:
-        return jsonify({"success": False, "message": "Missing required parameters"}), 400
-
-    channel_groups = getChannelGroups()
-    if group_name not in channel_groups:
-        return jsonify({"success": False, "message": "Group not found"}), 404
-
-    channels = channel_groups[group_name]["channels"]
-    if len(indexes) != len(channels):
-        return jsonify({"success": False, "message": "Invalid indexes list length"}), 400
-
-    # Create a new ordered list of channels based on the provided indexes
-    new_channels = []
-    for idx in indexes:
-        if idx < 0 or idx >= len(channels):
-            return jsonify({"success": False, "message": f"Invalid index: {idx}"}), 400
-        new_channels.append(channels[idx])
-
-    # Call the original reorder_channels function with adapted data
-    with app.test_request_context(
-        '/channels/reorder', 
-        method='POST',
-        json={
-            "group_name": group_name,
-            "channels": new_channels
-        }
-    ) as ctx:
-        # Process the request
-        response = reorder_channels()
-        
-        # Convert the response status field to success field
-        if isinstance(response, tuple):
-            return jsonify({"success": False, "message": "Reordering failed"}), 400
-        
-        data = response.get_json()
-        if data.get("status") == "success":
-            return jsonify({"success": True})
-        else:
-            return jsonify({"success": False, "message": data.get("message", "Unknown error")}), 400
-
-@app.route("/channels/delete_group", methods=["POST"])
-@authorise
-def delete_group():
-    """
-    Adapter API endpoint to delete a channel group.
-    """
-    data = request.get_json() # Get JSON data from request
-    group_name = data.get("group") # Get group name from JSON data
-    
-    # Call the original delete_channel_group function with adapted data
-    with app.test_request_context(
-        '/channels/delete', 
-        method='POST',
-        json={"group_name": group_name}
-    ) as ctx:
-        # Process the request
-        response = delete_channel_group()
-        
-        # Convert the response status field to success field
-        if isinstance(response, tuple):
-            return jsonify({"success": False, "message": "Group deletion failed"}), 400
-        
-        data = response.get_json()
-        if data.get("status") == "success":
-            return jsonify({"success": True})
-        else:
-            return jsonify({"success": False, "message": data.get("message", "Unknown error")}), 400
-
-@app.route("/channels/rename_group", methods=["POST"])
-@authorise
-def rename_group():
-    """
-    API endpoint to rename a channel group.
-    """
-    data = request.get_json() # Get JSON data from request
-    old_name = data.get("old_name") # Get old group name from JSON data
-    new_name = data.get("new_name") # Get new group name from JSON data
-    
-    if not old_name or not new_name:
-        return jsonify({"success": False, "message": "Old and new group names are required"}), 400
-        
-    channel_groups = getChannelGroups()
-    if old_name not in channel_groups:
-        return jsonify({"success": False, "message": "Group not found"}), 404
-        
-    if new_name in channel_groups:
-        return jsonify({"success": False, "message": "New group name already exists"}), 400
-        
-    # Copy group data to new name and delete old one
-    channel_groups[new_name] = channel_groups[old_name]
-    del channel_groups[old_name]
-    saveChannelGroups(channel_groups)
-    
-    return jsonify({"success": True})

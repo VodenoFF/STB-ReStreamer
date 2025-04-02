@@ -72,7 +72,7 @@
                                 </button>
                             </div>
                         </div>
-                        
+
                         <!-- Channels List -->
                         <div id="channel-list-container" class="flex-grow-1 overflow-auto">
                             <ul id="channel-list" class="list-group list-group-flush">
@@ -200,7 +200,7 @@
         let currentGroup = null;
         let groupChanged = false;
         let selectedLogo = null;
-        
+
         // ========== DOM Elements ==========
         const groupList = document.getElementById('group-list');
         const channelList = document.getElementById('channel-list');
@@ -215,16 +215,16 @@
         const changeLogoBtn = document.getElementById('change-logo-btn');
         const saveLogoBtn = document.getElementById('save-logo-btn');
         const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
-        
+
         // ========== Bootstrap Modals ==========
         const newGroupModal = new bootstrap.Modal(document.getElementById('new-group-modal'));
         const channelSearchModal = new bootstrap.Modal(document.getElementById('channel-search-modal'));
         const changeLogoModal = new bootstrap.Modal(document.getElementById('change-logo-modal'));
         const deleteConfirmationModal = new bootstrap.Modal(document.getElementById('delete-confirmation-modal'));
-        
+
         // ========== Initial Setup ==========
         loadGroups();
-        
+
         // Make channel list sortable
         new Sortable(channelList, {
             animation: 150,
@@ -236,18 +236,18 @@
                 saveOrderBtn.disabled = false;
             }
         });
-        
+
         // ========== Event Listeners ==========
-        
+
         // New Group Button
         newGroupBtn.addEventListener('click', function() {
             document.getElementById('new-group-form').reset();
             newGroupModal.show();
         });
-        
+
         // Create Group Button
         createGroupBtn.addEventListener('click', createNewGroup);
-        
+
         // Add Channel Button
         addChannelBtn.addEventListener('click', function() {
             const searchQuery = channelSearchInput.value.trim();
@@ -255,7 +255,7 @@
                 searchChannels(searchQuery);
             }
         });
-        
+
         // Channel Search Input - Enter Key
         channelSearchInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
@@ -266,13 +266,13 @@
                 }
             }
         });
-        
+
         // Add Selected Channels Button
         addSelectedChannelsBtn.addEventListener('click', addSelectedChannels);
-        
+
         // Save Order Button
         saveOrderBtn.addEventListener('click', saveChannelOrder);
-        
+
         // Delete Group Button
         deleteGroupBtn.addEventListener('click', function() {
             if (currentGroup) {
@@ -280,21 +280,21 @@
                 deleteConfirmationModal.show();
             }
         });
-        
+
         // Confirm Delete Button
         confirmDeleteBtn.addEventListener('click', deleteCurrentGroup);
-        
+
         // Change Logo Button
         changeLogoBtn.addEventListener('click', function() {
             loadLogos();
             changeLogoModal.show();
         });
-        
+
         // Save Logo Button
         saveLogoBtn.addEventListener('click', saveGroupLogo);
-        
+
         // ========== Functions ==========
-        
+
         // Load Groups
         function loadGroups() {
             // Show loading skeleton
@@ -312,7 +312,7 @@
                     <div class="skeleton-text" style="width: 25%;"></div>
                 </li>
             `;
-            
+
             // Fetch groups from server
             fetch('/groups')
                 .then(response => response.json())
@@ -329,7 +329,7 @@
                     `;
                 });
         }
-        
+
         // Render Groups
         function renderGroups() {
             if (groups.length === 0) {
@@ -341,20 +341,20 @@
                 `;
                 return;
             }
-            
+
             groupList.innerHTML = '';
-            
+
             groups.forEach(group => {
                 const groupItem = document.createElement('li');
                 groupItem.className = 'group-item';
                 groupItem.dataset.id = group.id;
-                
+
                 if (currentGroup && currentGroup.id === group.id) {
                     groupItem.classList.add('active');
                 }
-                
+
                 const iconClass = group.icon || 'bi-collection-fill';
-                
+
                 groupItem.innerHTML = `
                     <i class="bi ${iconClass} group-item-icon"></i>
                     <span>${group.name}</span>
@@ -366,21 +366,21 @@
                         <div class="copy-tooltip">URL Copied!</div>
                     </div>
                 `;
-                
+
                 groupItem.addEventListener('click', function(e) {
                     if (e.target.closest('.btn-copy-link')) {
                         e.stopPropagation();
                         copyPlaylistURL(group.id);
                         return;
                     }
-                    
+
                     selectGroup(group);
                 });
-                
+
                 groupList.appendChild(groupItem);
             });
         }
-        
+
         // Select Group
         function selectGroup(group) {
             if (groupChanged) {
@@ -389,9 +389,9 @@
                 }
                 groupChanged = false;
             }
-            
+
             currentGroup = group;
-            
+
             // Update UI
             const groupItems = document.querySelectorAll('.group-item');
             groupItems.forEach(item => {
@@ -400,16 +400,16 @@
                     item.classList.add('active');
                 }
             });
-            
+
             channelsTitle.textContent = group.name;
             changeLogoBtn.disabled = false;
             deleteGroupBtn.disabled = false;
             addChannelBtn.disabled = false;
-            
+
             // Load channels
             loadGroupChannels(group.id);
         }
-        
+
         // Load Group Channels
         function loadGroupChannels(groupId) {
             channelList.innerHTML = `
@@ -432,7 +432,7 @@
                     </div>
                 </li>
             `;
-            
+
             fetch(`/group/${groupId}/channels`)
                 .then(response => response.json())
                 .then(data => {
@@ -445,16 +445,17 @@
                         `;
                         return;
                     }
-                    
+
                     channelList.innerHTML = '';
-                    
+
                     data.forEach(channel => {
                         const channelItem = document.createElement('li');
                         channelItem.className = 'list-group-item d-flex align-items-center';
                         channelItem.dataset.id = channel.id;
-                        
+                        channelItem.dataset.portalId = channel.portalId || '';
+
                         const logoUrl = channel.logo || '/static/logos/default.png';
-                        
+
                         channelItem.innerHTML = `
                             <div class="channel-drag-handle me-2">
                                 <i class="bi-grip-vertical text-muted"></i>
@@ -475,10 +476,10 @@
                                 </button>
                             </div>
                         `;
-                        
+
                         channelList.appendChild(channelItem);
                     });
-                    
+
                     // Add event listeners to button actions
                     document.querySelectorAll('.remove-channel-btn').forEach(button => {
                         button.addEventListener('click', function() {
@@ -486,7 +487,7 @@
                             removeChannelFromGroup(channelId);
                         });
                     });
-                    
+
                     document.querySelectorAll('.move-up-btn').forEach(button => {
                         button.addEventListener('click', function() {
                             const channelId = this.dataset.id;
@@ -495,7 +496,7 @@
                             moveChannel(index, 'up');
                         });
                     });
-                    
+
                     document.querySelectorAll('.move-down-btn').forEach(button => {
                         button.addEventListener('click', function() {
                             const channelId = this.dataset.id;
@@ -514,23 +515,23 @@
                     `;
                 });
         }
-        
+
         // Create New Group
         function createNewGroup() {
             const groupName = document.getElementById('group-name').value.trim();
             const groupIcon = document.getElementById('group-icon').value;
-            
+
             if (!groupName) {
                 alert('Please enter a group name');
                 return;
             }
-            
-            fetch('/channels/create_group', {
+
+            fetch('/channels/create', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ group: groupName, icon: groupIcon }),
+                body: JSON.stringify({ group_name: groupName, icon: groupIcon }),
             })
             .then(response => response.json())
             .then(data => {
@@ -546,7 +547,7 @@
                 alert('Error creating group: ' + error.message);
             });
         }
-        
+
         // Search Channels
         function searchChannels(query) {
             // In a real implementation, this would search the server for channels
@@ -560,10 +561,10 @@
                     <p class="mt-2">Searching for "${query}"...</p>
                 </div>
             `;
-            
+
             // Open the search modal
             channelSearchModal.show();
-            
+
             // Simulate a server request
             setTimeout(() => {
                 const mockResults = [
@@ -571,7 +572,7 @@
                     { id: 'ch2', name: 'Channel 2', category: 'News' },
                     { id: 'ch3', name: 'Channel 3', category: 'Sports' },
                 ];
-                
+
                 if (mockResults.length === 0) {
                     searchResults.innerHTML = `
                         <div class="text-center p-4 text-muted">
@@ -581,16 +582,16 @@
                     `;
                     return;
                 }
-                
+
                 searchResults.innerHTML = '';
-                
+
                 mockResults.forEach(channel => {
                     const channelItem = document.createElement('a');
                     channelItem.className = 'list-group-item list-group-item-action d-flex align-items-center';
                     channelItem.dataset.id = channel.id;
-                    
+
                     const logoUrl = channel.logo || '/static/logos/default.png';
-                    
+
                     channelItem.innerHTML = `
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" value="${channel.id}" id="channel-${channel.id}">
@@ -602,54 +603,59 @@
                             <div class="text-muted small">${channel.category || 'No category'}</div>
                         </div>
                     `;
-                    
+
                     searchResults.appendChild(channelItem);
                 });
             }, 1000);
         }
-        
+
         // Add Selected Channels
         function addSelectedChannels() {
             const selectedChannels = Array.from(document.querySelectorAll('#search-results input[type="checkbox"]:checked'))
                 .map(checkbox => checkbox.value);
-            
+
             if (selectedChannels.length === 0) {
                 alert('Please select at least one channel');
                 return;
             }
-            
+
             if (!currentGroup) {
                 alert('Please select a group first');
                 return;
             }
-            
+
             // In a real implementation, this would add the channels to the group on the server
             // For now, let's simulate
             channelSearchModal.hide();
-            
+
             // Simulate a server request
             setTimeout(() => {
                 loadGroupChannels(currentGroup.id);
             }, 500);
         }
-        
+
         // Save Channel Order
         function saveChannelOrder() {
             if (!currentGroup) {
                 return;
             }
-            
+
             const channelIds = Array.from(document.querySelectorAll('#channel-list li'))
                 .map(item => item.dataset.id);
-            
-            fetch('/channels/reorder_channels', {
+
+            fetch('/channels/reorder', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    group: currentGroup.id,
-                    indexes: Array.from(Array(channelIds.length).keys()) // Just use sequential indexes for now
+                    group_name: currentGroup.id,
+                    channels: Array.from(document.querySelectorAll('#channel-list li')).map(item => {
+                        return {
+                            channelId: item.dataset.id,
+                            portalId: item.dataset.portalId
+                        };
+                    })
                 }),
             })
             .then(response => response.json())
@@ -666,19 +672,19 @@
                 alert('Error saving order: ' + error.message);
             });
         }
-        
+
         // Delete Current Group
         function deleteCurrentGroup() {
             if (!currentGroup) {
                 return;
             }
-            
-            fetch('/channels/delete_group', {
+
+            fetch('/channels/delete', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ group: currentGroup.id }),
+                body: JSON.stringify({ group_name: currentGroup.id }),
             })
             .then(response => response.json())
             .then(data => {
@@ -707,7 +713,7 @@
                 alert('Error deleting group: ' + error.message);
             });
         }
-        
+
         // Load Logos
         function loadLogos() {
             const logoGrid = document.getElementById('logo-grid');
@@ -719,26 +725,26 @@
                     <p class="mt-2">Loading logos...</p>
                 </div>
             `;
-            
+
             // In a real implementation, this would load logos from the server
             // For now, let's simulate
             setTimeout(() => {
                 logoGrid.innerHTML = '';
-                
-                ['bi-collection-fill', 'bi-tv-fill', 'bi-film', 'bi-music-note-beamed', 
+
+                ['bi-collection-fill', 'bi-tv-fill', 'bi-film', 'bi-music-note-beamed',
                 'bi-camera-video-fill', 'bi-newspaper', 'bi-trophy-fill', 'bi-globe',
                 'bi-star-fill', 'bi-heart-fill'].forEach(icon => {
                     const logoItem = document.createElement('div');
                     logoItem.className = 'logo-item';
                     logoItem.dataset.icon = icon;
-                    
+
                     if (currentGroup && currentGroup.icon === icon) {
                         logoItem.classList.add('selected');
                         selectedLogo = icon;
                     }
-                    
+
                     logoItem.innerHTML = `<i class="bi ${icon}"></i>`;
-                    
+
                     logoItem.addEventListener('click', function() {
                         document.querySelectorAll('.logo-item').forEach(item => {
                             item.classList.remove('selected');
@@ -746,22 +752,22 @@
                         this.classList.add('selected');
                         selectedLogo = this.dataset.icon;
                     });
-                    
+
                     logoGrid.appendChild(logoItem);
                 });
             }, 500);
         }
-        
+
         // Save Group Logo
         function saveGroupLogo() {
             if (!currentGroup || !selectedLogo) {
                 return;
             }
-            
+
             // This would be an actual API call in a real implementation
             // Let's simulate for now
             changeLogoModal.hide();
-            
+
             // Update the group icon in the UI
             const groupItem = document.querySelector(`.group-item[data-id="${currentGroup.id}"]`);
             if (groupItem) {
@@ -771,11 +777,11 @@
                 }
             }
         }
-        
+
         // Copy Playlist URL
         function copyPlaylistURL(groupId) {
             const playlistURL = `${window.location.origin}/groups_playlist/${groupId}`;
-            
+
             navigator.clipboard.writeText(playlistURL)
                 .then(() => {
                     const tooltipElement = document.querySelector(`.group-item[data-id="${groupId}"] .copy-tooltip`);
@@ -791,13 +797,13 @@
                     alert('Failed to copy URL to clipboard');
                 });
         }
-        
+
         // Move Channel Up or Down
         function moveChannel(index, direction) {
             if (!currentGroup) {
                 return;
             }
-            
+
             const items = channelList.children;
             if (direction === 'up' && index > 0) {
                 channelList.insertBefore(items[index], items[index - 1]);
@@ -809,23 +815,23 @@
                 saveOrderBtn.disabled = false;
             }
         }
-        
+
         // Remove Channel from Group
         function removeChannelFromGroup(channelId) {
             if (!currentGroup) {
                 return;
             }
-            
+
             if (confirm('Are you sure you want to remove this channel from the group?')) {
                 // This would be an actual API call in a real implementation
                 // Let's simulate for now
-                
+
                 // Remove the channel item from the UI
                 const channelItem = document.querySelector(`#channel-list li[data-id="${channelId}"]`);
                 if (channelItem) {
                     channelItem.remove();
                 }
-                
+
                 // Update channel count in the group list
                 const groupItem = document.querySelector(`.group-item[data-id="${currentGroup.id}"]`);
                 if (groupItem) {
@@ -835,7 +841,7 @@
                         countElement.textContent = Math.max(0, currentCount - 1);
                     }
                 }
-                
+
                 groupChanged = true;
                 saveOrderBtn.disabled = false;
             }

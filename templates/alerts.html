@@ -183,7 +183,7 @@
     function filterAlerts(type) {
         const rows = document.querySelectorAll('.alert-row');
         const filterButtons = document.querySelectorAll('.filter-buttons .app-btn');
-        
+
         // Update active button state
         filterButtons.forEach(btn => {
             btn.classList.remove('active');
@@ -191,7 +191,7 @@
                 btn.classList.add('active');
             }
         });
-        
+
         // Filter rows
         rows.forEach(row => {
             if (type === 'all' || row.getAttribute('data-type') === type) {
@@ -204,7 +204,13 @@
 
     // Resolve alert
     function resolveAlert(alertId) {
-        fetch(`/alerts/resolve/${alertId}`, { method: 'POST' })
+        fetch('/resolve_alert', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ alert_id: alertId })
+        })
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
@@ -216,20 +222,20 @@
                     const row = document.querySelector(`[data-alert-id="${alertId}"]`);
                     const statusCell = row.querySelector('td:nth-child(5)');
                     const actionCell = row.querySelector('td:nth-child(6)');
-                    
+
                     // Update status badge
                     statusCell.innerHTML = `
                         <span class="app-badge success">
                             <i class="bi-check-circle-fill"></i> Resolved
                         </span>
                     `;
-                    
+
                     // Remove action button
                     actionCell.innerHTML = '';
-                    
+
                     // Update row data attribute
                     row.setAttribute('data-status', 'resolved');
-                    
+
                     // Update counts
                     updateAlertCounts();
                 }
@@ -247,11 +253,11 @@
         let errorCount = 0;
         let warningCount = 0;
         let resolvedCount = 0;
-        
+
         rows.forEach(row => {
             const type = row.getAttribute('data-type');
             const status = row.getAttribute('data-status');
-            
+
             if (status === 'active') {
                 if (type === 'error') {
                     errorCount++;
@@ -262,13 +268,13 @@
                 resolvedCount++;
             }
         });
-        
+
         // Update count elements
         document.getElementById('errorCount').textContent = errorCount;
         document.getElementById('warningCount').textContent = warningCount;
         document.getElementById('resolvedCount').textContent = resolvedCount;
         document.getElementById('totalCount').textContent = totalCount;
-        
+
         // Update progress bars
         if (totalCount > 0) {
             document.getElementById('errorProgress').style.width = `${(errorCount / totalCount) * 100}%`;

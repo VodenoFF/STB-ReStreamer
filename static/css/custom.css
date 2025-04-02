@@ -1,35 +1,35 @@
 :root {
     /* Core color palette - expanded with HSL for better manipulation */
-    --primary-bg-hsl: 0, 0%, 7%;
+    --primary-bg-hsl: 0, 0%, 7%; /* Matches the solid black background */
     --secondary-bg-hsl: 0, 0%, 12%;
     --accent-bg-hsl: 0, 0%, 16%;
     --primary-text-hsl: 0, 0%, 88%;
     --secondary-text-hsl: 0, 0%, 63%;
-    
+
     /* Primary colors as both HSL and hex for versatility */
     --primary-bg: hsl(var(--primary-bg-hsl));
     --secondary-bg: hsl(var(--secondary-bg-hsl));
     --accent-bg: hsl(var(--accent-bg-hsl));
     --primary-text: hsl(var(--primary-text-hsl));
     --secondary-text: hsl(var(--secondary-text-hsl));
-    
+
     /* Modern accent color with variations */
     --accent-hsl: 213, 70%, 59%;
     --accent-color: hsl(var(--accent-hsl));
     --accent-light: hsl(var(--accent-hsl), 70%);
     --accent-dark: hsl(var(--accent-hsl), 45%);
     --accent-color-rgb: 74, 144, 226;
-    
+
     /* Surface colors for layering */
     --surface-1: hsl(0, 0%, 10%);
     --surface-2: hsl(0, 0%, 13%);
     --surface-3: hsl(0, 0%, 18%);
-    
+
     /* Border colors */
     --border-color: hsl(0, 0%, 20%);
     --border-light: hsla(0, 0%, 100%, 0.08);
     --border-focus: hsla(var(--accent-hsl), 0.5);
-    
+
     /* Feedback colors with HSL for transparency control */
     --success-hsl: 134, 61%, 41%;
     --success-color: hsl(var(--success-hsl));
@@ -39,7 +39,7 @@
     --warning-color: hsl(var(--warning-hsl));
     --danger-hsl: 354, 70%, 54%;
     --danger-color: hsl(var(--danger-hsl));
-    
+
     /* Spacing system (8pt grid) */
     --space-xxs: 0.25rem; /* 4px */
     --space-xs: 0.5rem;   /* 8px */
@@ -48,17 +48,17 @@
     --space-lg: 1.5rem;   /* 24px */
     --space-xl: 2rem;     /* 32px */
     --space-xxl: 3rem;    /* 48px */
-    
+
     /* Border radius */
     --border-radius-sm: 0.25rem; /* 4px */
     --border-radius-md: 0.5rem;  /* 8px */
     --border-radius-lg: 0.75rem; /* 12px */
     --border-radius-xl: 1rem;    /* 16px */
     --border-radius-pill: 9999px;
-    
+
     /* Shadows with transparency for layering */
     --shadow-color: 0deg 0% 0%;
-    --shadow-elevation-low: 
+    --shadow-elevation-low:
       0.1px 0.2px 0.3px hsl(var(--shadow-color) / 0.2),
       0.1px 0.3px 0.5px -1.2px hsl(var(--shadow-color) / 0.2),
       0.2px 0.7px 1.1px -2.5px hsl(var(--shadow-color) / 0.2);
@@ -76,12 +76,12 @@
       4.8px 9.7px 15.3px -1.8px hsl(var(--shadow-color) / 0.25),
       7.5px 15px 23.7px -2.1px hsl(var(--shadow-color) / 0.25),
       11.3px 22.6px 35.7px -2.5px hsl(var(--shadow-color) / 0.25);
-      
+
     /* Animation timings */
     --transition-fast: 150ms ease;
     --transition-normal: 250ms ease;
     --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
-    
+
     /* Typography */
     --font-weight-normal: 400;
     --font-weight-medium: 500;
@@ -91,7 +91,7 @@
     --font-size-md: 1rem;      /* 16px */
     --font-size-lg: 1.125rem;  /* 18px */
     --font-size-xl: 1.25rem;   /* 20px */
-    
+
     /* Z-index system */
     --z-below: -1;
     --z-normal: 1;
@@ -99,7 +99,7 @@
     --z-floating: 1030;
     --z-modal: 1050;
     --z-toast: 2000;
-    
+
     /* Focus outline - WCAG 2.1 compliant */
     --focus-ring-color: hsla(var(--accent-hsl), 0.55);
     --focus-ring-offset: 3px;
@@ -121,7 +121,7 @@ html {
 }
 
 body {
-    background-color: var(--primary-bg);
+    background-color: hsl(0, 0%, 7%); /* Match navbar background */
     color: var(--primary-text);
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     line-height: 1.6;
@@ -174,7 +174,7 @@ body {
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
     }
-    
+
     html {
         scroll-behavior: auto;
     }
@@ -183,7 +183,7 @@ body {
 /* Animated gradient option for accent elements */
 .animated-gradient {
     background: linear-gradient(
-        270deg, 
+        270deg,
         hsl(var(--accent-hsl)),
         hsl(calc(var(--accent-hsl) + 20), 70%, 59%),
         hsl(var(--accent-hsl))
@@ -235,21 +235,23 @@ body {
 
 /* Modern Navbar */
 .navbar {
-    background: hsla(var(--secondary-bg-hsl), 0.8) !important;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    box-shadow: var(--shadow-elevation-low);
-    border: 1px solid var(--border-light);
-    border-radius: var(--border-radius-md);
+    background: transparent !important; /* Fully transparent background */
+    /* No backdrop filters needed for transparent navbar */
+    box-shadow: none; /* Removed shadow */
+    border: none; /* Removed border */
+    border-radius: 0;
     transition: box-shadow var(--transition-normal);
     position: sticky;
-    top: var(--space-md);
+    top: 0;
     z-index: 1030;
-    margin: var(--space-md);
+    margin: 0;
 }
 
-.navbar:hover {
-    box-shadow: var(--shadow-elevation-medium);
+/* Navbar elements should all be transparent */
+.navbar-collapse,
+.navbar-toggler,
+.navbar-nav {
+    background: transparent !important;
 }
 
 .navbar-brand {
@@ -396,7 +398,7 @@ body {
     color: white;
 }
 
-.btn-primary:hover, 
+.btn-primary:hover,
 .btn-primary:focus {
     background-color: hsl(var(--accent-hsl), 50%);
     border-color: hsl(var(--accent-hsl), 45%);
@@ -630,14 +632,14 @@ body {
 .card-neumorphic {
     background: var(--secondary-bg);
     border: none;
-    box-shadow: 
+    box-shadow:
         5px 5px 10px rgba(0, 0, 0, 0.2),
         -5px -5px 10px rgba(255, 255, 255, 0.05);
     transition: all var(--transition-normal);
 }
 
 .card-neumorphic:hover {
-    box-shadow: 
+    box-shadow:
         2px 2px 5px rgba(0, 0, 0, 0.2),
         -2px -2px 5px rgba(255, 255, 255, 0.05);
 }
@@ -837,7 +839,7 @@ body {
     margin: var(--space-xs) 0;
 }
 
-.dataTables_length label, 
+.dataTables_length label,
 .dataTables_filter label {
     display: flex;
     align-items: center;
@@ -944,7 +946,7 @@ body {
 }
 
 .modal-backdrop.show {
-    opacity: 0.7;
+    opacity: 0.0;
 }
 
 .modal-header {
@@ -1090,13 +1092,13 @@ body {
     opacity: 1;
 }
 
-.dropdown-item:hover, 
+.dropdown-item:hover,
 .dropdown-item:focus {
     background: var(--accent-color);
     color: white;
 }
 
-.dropdown-item.active, 
+.dropdown-item.active,
 .dropdown-item:active {
      background: var(--accent-color);
     color: white;
@@ -1134,15 +1136,15 @@ body {
     transition: all var(--transition-fast);
 }
 
-.list-group-item:first-child { 
-    border-top-left-radius: 0; 
-    border-top-right-radius: 0; 
+.list-group-item:first-child {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
 }
 
-.list-group-item:last-child { 
-    border-bottom-left-radius: 0; 
-    border-bottom-right-radius: 0; 
-    border-bottom-width: 0; 
+.list-group-item:last-child {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom-width: 0;
 }
 
 .list-group-item.active {
@@ -1166,7 +1168,7 @@ body {
     transition: all var(--transition-fast);
 }
 
-.list-group-item-action:hover, 
+.list-group-item-action:hover,
 .list-group-item-action:focus {
     background-color: var(--surface-2);
     color: var(--primary-text);
@@ -1260,8 +1262,8 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, 
-        rgba(255, 255, 255, 0.07) 0%, 
+    background: linear-gradient(90deg,
+        rgba(255, 255, 255, 0.07) 0%,
         rgba(255, 255, 255, 0) 100%);
     pointer-events: none;
 }
@@ -1284,28 +1286,28 @@ body {
     transform: translateY(-50%) rotate(90deg);
 }
 
-.alert-success { 
-    background-color: hsla(var(--success-hsl), 0.1); 
-    border-left-color: var(--success-color); 
-    color: hsl(var(--success-hsl), 80%); 
+.alert-success {
+    background-color: hsla(var(--success-hsl), 0.1);
+    border-left-color: var(--success-color);
+    color: hsl(var(--success-hsl), 80%);
 }
 
-.alert-info { 
-    background-color: hsla(var(--info-hsl), 0.1); 
-    border-left-color: var(--info-color); 
-    color: hsl(var(--info-hsl), 80%); 
+.alert-info {
+    background-color: hsla(var(--info-hsl), 0.1);
+    border-left-color: var(--info-color);
+    color: hsl(var(--info-hsl), 80%);
 }
 
-.alert-warning { 
-    background-color: hsla(var(--warning-hsl), 0.1); 
-    border-left-color: var(--warning-color); 
-    color: hsl(var(--warning-hsl), 70%); 
+.alert-warning {
+    background-color: hsla(var(--warning-hsl), 0.1);
+    border-left-color: var(--warning-color);
+    color: hsl(var(--warning-hsl), 70%);
 }
 
-.alert-danger { 
-    background-color: hsla(var(--danger-hsl), 0.1); 
-    border-left-color: var(--danger-color); 
-    color: hsl(var(--danger-hsl), 80%); 
+.alert-danger {
+    background-color: hsla(var(--danger-hsl), 0.1);
+    border-left-color: var(--danger-color);
+    color: hsl(var(--danger-hsl), 80%);
 }
 
 /* Alert with icon */
@@ -1461,7 +1463,7 @@ body {
   color: white;
 }
 
-.btn-primary:hover, 
+.btn-primary:hover,
 .btn-primary:focus {
   background-color: hsl(var(--accent-hsl), 50%);
   border-color: hsl(var(--accent-hsl), 45%);
@@ -1685,7 +1687,7 @@ pre, .pre {
 
 /* ========== DESIGN SYSTEM STANDARDIZATION ========== */
 
-/* 
+/*
  * Standardized Page Headers
  * Used for consistent page title sections across all pages
 */
@@ -1719,7 +1721,7 @@ pre, .pre {
     opacity: 0.25;
 }
 
-/* 
+/*
  * Standardized Card System
  * Provides consistent card styling with variants for different purposes
 */
@@ -1796,7 +1798,7 @@ pre, .pre {
     -webkit-backdrop-filter: blur(10px);
 }
 
-/* 
+/*
  * Standardized Form Elements
  * Ensures consistent form styling across all pages
 */
@@ -1861,7 +1863,7 @@ pre, .pre {
     color: var(--accent-color);
 }
 
-/* 
+/*
  * Standardized Button System
  * Provides consistent button styling and variants
 */
@@ -1957,7 +1959,7 @@ pre, .pre {
     font-size: var(--font-size-lg);
 }
 
-/* 
+/*
  * Standardized Data Presentation
  * Consistent styles for displaying data in tables, lists, and cards
 */
@@ -2047,7 +2049,7 @@ pre, .pre {
     box-shadow: 0 0 0 2px hsla(var(--secondary-text-hsl), 0.2);
 }
 
-/* 
+/*
  * Standardized Badges and Tags
  * Consistent styling for badges, tags, and labels
 */

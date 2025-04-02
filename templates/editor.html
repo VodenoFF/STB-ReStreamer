@@ -1,4 +1,29 @@
 {% extends "base.html" %}
+
+{% block head %}
+<!-- Add jQuery UI for autocomplete functionality -->
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/dark-hive/jquery-ui.css">
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+<script>
+    // Fallback to load jQuery UI if it's not already loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof $.ui === 'undefined') {
+            console.log('jQuery UI not detected, loading fallback...');
+            var script = document.createElement('script');
+            script.src = 'https://code.jquery.com/ui/1.13.2/jquery-ui.min.js';
+            script.onload = function() {
+                console.log('jQuery UI loaded successfully');
+                // Re-initialize autocomplete if needed
+                if (typeof initializeAutocomplete === 'function') {
+                    setTimeout(initializeAutocomplete, 500);
+                }
+            };
+            document.head.appendChild(script);
+        }
+    });
+</script>
+{% endblock %}
+
 {% block content %}
 
 <div class="container-fluid table-responsive p-lg-5">
@@ -105,22 +130,7 @@
     <form action="/editor/reset" method="post" id="reset" hidden>
     </form>
 
-    <!-- Video Modal -->
-    <div class="modal fade" id="videoModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="channelLabel">Channel</h5>
-                </div>
-                <div class="modal-body">
-                    <video width="100%" id="player" controls autoplay>
-                        <source src="" type="video/mp4">
-                        Your browser does not support HTML video.
-                    </video>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- No modal needed since we're using a separate window -->
 
 </div>
 
@@ -193,18 +203,18 @@
                 "{{ group_name }}"{% if not loop.last %},{% endif %}
             {%- endfor -%}
         ];
-        
+
         // Sort group names alphabetically
         groupNames.sort();
-        
+
         // Add sorted groups
         groupNames.forEach(groupName => {
             options += `<option value="${groupName}" ${selectedGroup === groupName ? 'selected' : ''}>${groupName}</option>`;
         });
-        
+
         // Add "No Group" at the end
         options += '<option value="" ' + (selectedGroup === '' ? 'selected' : '') + '>No Group</option>';
-        
+
         return options;
     }
 
@@ -226,7 +236,7 @@
         } catch (e) {
             console.error('Invalid URL:', linkToCopy);
         }
-        
+
         navigator.clipboard.writeText(url).then(() => {
             console.log('Link copied:', url);
         }).catch(err => {
@@ -244,22 +254,36 @@
         document.getElementById("save edits").submit();
     }
 
-    var player = document.getElementById("player")
-    var title = document.getElementById("channelLabel")
-    player.volume = 0.25
-    function selectChannel(ele) {
-        link = ele.getAttribute('data-link');
-        player.src = link;
-        channel = ele.getAttribute('data-customChannelName');
-        if (channel == "") {
-            channel = ele.getAttribute('data-channelName');
+    // Function to open player in a new window
+    function openPlayerWindow(ele) {
+        // Get channel data
+        const channelId = ele.getAttribute('data-channel-id');
+        const portalId = ele.getAttribute('data-portal');
+        const channelName = ele.getAttribute('data-customChannelName') || ele.getAttribute('data-channelName');
+
+        // Create a dedicated player URL
+        const playerUrl = `/player/${portalId}/${channelId}`;
+
+        // Open in a new window with specific size and features
+        const playerWindow = window.open(
+            playerUrl,
+            `player_${portalId}_${channelId}`,
+            'width=800,height=600,resizable=yes,scrollbars=no,status=no,location=no'
+        );
+
+        // Focus the new window
+        if (playerWindow) {
+            playerWindow.focus();
         }
-        title.innerHTML = channel
     }
 
-    $('#videoModal').on('hidden.bs.modal', function () {
-        player.src = "";
-    })
+    // No error handling needed here since we're using a separate window
+
+    // No additional code needed since we're using a separate window
+
+
+
+
 
     /* Create an array with the values of all the checkboxes in a column */
     $.fn.dataTable.ext.order['dom-checkbox'] = function (settings, col) {
@@ -307,6 +331,8 @@
     // Initialize DataTable with optimized search
     let dataTable;
     $(document).ready(function () {
+        // Fix for Bootstrap modal and DataTable interaction
+        $.fn.dataTable.ext.errMode = 'none'; // Prevent DataTable errors from interfering with the modal
         // Add custom sorting for groups
         $.fn.dataTable.ext.order['dom-select'] = function (settings, col) {
             return this.api().column(col, { order: 'index' }).nodes().map(function (td, i) {
@@ -400,12 +426,12 @@
                     searchable: false,
                     className: 'text-center align-middle',
                     render: function (data, type, row) {
-                        return '<button class="btn btn-sm btn-primary play-button" ' +
-                            'data-bs-toggle="modal" ' +
-                            'data-bs-target="#videoModal" ' +
+                        return '<button class="play-button" ' +
+                            'onclick="openPlayerWindow(this)" ' +
                             'data-channel-id="' + row.channelId + '" ' +
                             'data-channel-name="' + row.channelName + '" ' +
                             'data-customChannelName="' + row.customChannelName + '" ' +
+                            'data-portal="' + row.portal + '" ' +
                             'data-link="' + row.link + '">' +
                             '<i class="bi-play-fill"></i></button>';
                     }
@@ -528,16 +554,21 @@
 
     // Initialize autocomplete for search inputs
     function initializeAutocomplete() {
-        // Using jQuery UI autocomplete
-        $('#genreSearch').autocomplete({
-            source: Array.from(uniqueValues.genres),
-            minLength: 2
-        });
-        
-        $('#groupSearch').autocomplete({
-            source: Array.from(uniqueValues.groups),
-            minLength: 1
-        });
+        // Check if jQuery UI is loaded
+        if (typeof $.ui !== 'undefined' && typeof $.ui.autocomplete === 'function') {
+            // Using jQuery UI autocomplete
+            $('#genreSearch').autocomplete({
+                source: Array.from(uniqueValues.genres),
+                minLength: 2
+            });
+
+            $('#groupSearch').autocomplete({
+                source: Array.from(uniqueValues.groups),
+                minLength: 1
+            });
+        } else {
+            console.warn('jQuery UI autocomplete not available. Some search features may be limited.');
+        }
     }
 
     // Apply search filters
@@ -572,7 +603,7 @@
         const matchesPortal = !portal || data[8].includes(portal);
         const matchesEnabled = !enabledOnly || rowData.enabled;
 
-        return matchesName && matchesGenre && matchesNumber && matchesEpg && 
+        return matchesName && matchesGenre && matchesNumber && matchesEpg &&
                matchesGroup && matchesPortal && matchesEnabled;
     });
 
@@ -608,6 +639,276 @@
     color: white !important;
     border-radius: 5px;
     padding: 10px !important;
+}
+
+/* Video Modal Styles */
+.video-container {
+    position: relative;
+    background-color: #000;
+    aspect-ratio: 16/9;
+    width: 100%;
+    overflow: hidden;
+}
+
+.video-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background-color: #000;
+    z-index: 1;
+}
+
+/* Hide native controls when our custom controls are active */
+.video-container video::-webkit-media-controls {
+    display: none !important;
+}
+
+.video-container video::-webkit-media-controls-enclosure {
+    display: none !important;
+}
+
+.video-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 3;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none; /* Allow clicks to pass through when hidden */
+}
+
+.video-overlay.show {
+    opacity: 1;
+    pointer-events: auto; /* Capture clicks when visible */
+}
+
+/* Custom video controls */
+.custom-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.video-container:hover .custom-controls,
+.custom-controls:hover,
+.custom-controls.active {
+    opacity: 1;
+}
+
+.control-bar {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    background: linear-gradient(to top, rgba(0,0,0,0.8), rgba(0,0,0,0));
+    height: 60px;
+}
+
+.control-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0 5px;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+}
+
+.control-btn:hover {
+    background-color: rgba(255,255,255,0.2);
+}
+
+.progress-container {
+    flex-grow: 1;
+    height: 8px;
+    margin: 0 10px;
+    position: relative;
+    cursor: pointer;
+}
+
+.progress-bar {
+    height: 4px;
+    width: 100%;
+    background-color: rgba(255,255,255,0.3);
+    border-radius: 2px;
+    position: relative;
+    top: 2px;
+}
+
+.progress-indicator {
+    height: 100%;
+    width: 0%;
+    background-color: #4a6cf7;
+    border-radius: 2px;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.volume-slider-container {
+    width: 80px;
+    margin: 0 10px 0 0;
+}
+
+.volume-slider {
+    width: 100%;
+    height: 4px;
+    -webkit-appearance: none;
+    background-color: rgba(255,255,255,0.3);
+    border-radius: 2px;
+    outline: none;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: white;
+    cursor: pointer;
+}
+
+.volume-slider::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: white;
+    cursor: pointer;
+    border: none;
+}
+
+.channel-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--accent-bg);
+    border-radius: 50%;
+    color: var(--accent);
+    font-size: 16px;
+}
+
+/* Improved Play Button */
+.play-button {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: all 0.2s ease;
+    background: linear-gradient(135deg, #4a6cf7, #2541b2);
+    border: none;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.play-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(135deg, #5a7cf7, #3551c2);
+}
+
+.play-button i {
+    font-size: 18px;
+    margin-left: 2px; /* Slight offset for play icon */
+}
+
+/* Fullscreen mode */
+.video-container.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    aspect-ratio: unset;
+}
+
+/* Modal controls */
+.modal-controls {
+    display: flex;
+    align-items: center;
+}
+
+/* Error container styles */
+.error-container {
+    max-width: 90%;
+    margin: 0 auto;
+    padding: 20px;
+    color: #fff;
+}
+
+.error-container h5 {
+    font-weight: 600;
+    color: #f8d7da;
+}
+
+.error-container .text-muted {
+    color: #adb5bd !important;
+}
+
+.troubleshooting-tips {
+    background-color: rgba(0, 0, 0, 0.4);
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 15px;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Play button styles */
+.play-button {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: all 0.2s ease;
+    background: linear-gradient(135deg, #4a6cf7, #2541b2);
+    border: none;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.play-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(135deg, #5a7cf7, #3551c2);
+}
+
+.play-button i {
+    font-size: 18px;
+    margin-left: 2px; /* Slight offset for play icon */
+}
+
+.troubleshooting-tips ul {
+    margin-bottom: 10px;
+    padding-left: 25px;
+}
+
+.troubleshooting-tips li {
+    margin-bottom: 5px;
+    color: #adb5bd;
 }
 </style>
 {% endblock %}

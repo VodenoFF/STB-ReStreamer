@@ -292,6 +292,4 @@ def getEpg(url, mac, token, period, proxy=None):
             return data
     except:
         pass
-#tok = getToken("http://stb.homeiptv.org/stalker_portal/server/load.php", "00:1A:79:02:73:0f")
-#prof = getProfile("http://stb.homeiptv.org/stalker_portal/server/load.php", "00:1A:79:02:73:0f", tok, "0A057193CAB36850FF9A0882563B7E289A054B9A417FFC6C9F8FE8BC08CFE814", "0A057193CAB36850FF9A0882563B7E289A054B9A417FFC6C9F8FE8BC08CFE814", "E092553B55DABA4DBB0EC8E5BC7ACD8F3221F8DEFF2297B1ED1F427EB77C4DAD", int(time.time()))
-#link = getLink("http://stb.homeiptv.org/stalker_portal/server/load.php", "00:1A:79:02:73:0f", tok, "ffrt http:///ch/45585")
+
