@@ -1,134 +1,206 @@
 {% extends "base.html" %}
+
+{% block title %}Dashboard - STB ReStreamer{% endblock %}
+
 {% block content %}
-
-<div class="container-fluid text-light p-lg-5">
-    <h4>Streaming</h4>
-    <hr>
-    <div class="container-fluid">
-
-        <div class="row row-cols-auto" id="streamOut">
-
-        </div>
-
+<div class="container-fluid p-lg-5">
+    <!-- Streaming Section -->
+    <div class="page-header">
+        <h2 class="title">Streaming</h2>
+        <p class="subtitle">Active streams and playback sessions</p>
+        <div class="divider"></div>
     </div>
 
-    <br>
-    <br>
-
-    <h4>Log</h4>
-    <hr>
-    <div class="p-sm-3">
-        <div class="row row-cols-auto mb-2">
-            <span class="col">Autoscroll:</span>
-            <div class="form-check form-switch col">
-                <input type="checkbox" class="checkbox form-check-input" id="autoscroll" checked>
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-5 stagger-animation" id="streamOut">
+        <!-- Loading state will be replaced by JS -->
+        <div class="col">
+            <div class="data-card skeleton">
+                <div class="card-header skeleton-text"></div>
+                <div class="card-body p-3">
+                    <div class="skeleton-text"></div>
+                    <div class="skeleton-text"></div>
+                    <div class="skeleton-text"></div>
+                </div>
             </div>
         </div>
-        <pre class="border p-3" style="height: 40pc; overflow-y: scroll;" id="logOut"></pre>
+        <div class="col">
+            <div class="data-card skeleton">
+                <div class="card-header skeleton-text"></div>
+                <div class="card-body p-3">
+                    <div class="skeleton-text"></div>
+                    <div class="skeleton-text"></div>
+                    <div class="skeleton-text"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Section -->
+    <div class="page-header">
+        <h2 class="title">Log</h2>
+        <p class="subtitle">System activity and events</p>
+        <div class="divider"></div>
+    </div>
+
+    <div class="app-card primary mb-5">
+        <div class="card-header">
+            <h4 class="title"><i class="bi-terminal"></i> System Log</h4>
+            <div class="d-flex align-items-center gap-2">
+                <label for="autoscroll" class="form-check-label me-2">Autoscroll:</label>
+                <div class="form-check form-switch">
+                    <input type="checkbox" class="form-check-input" id="autoscroll" checked>
+                </div>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <pre id="logOut" class="p-3 mb-0 custom-scroll monospace" style="height: 40rem; background-color: var(--primary-bg);">Loading log data...</pre>
+        </div>
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
-    // Log
-    var logURL = "{{ url_for('log') }}";
-    var logOut = document.getElementById('logOut');
-    var autoscroll = document.getElementById('autoscroll');
-    setInterval(function updateLog() {
-        fetch(logURL)
-            .then(function (response) {
-                return response.text();
-            })
-            .then(function (text) {
-                logOut.textContent = text;
-                if (autoscroll.checked) {
-                    logOut.scrollTop = logOut.scrollHeight;
-                }
-            })
-        return updateLog;
-    }(), 2000);
+    document.addEventListener('DOMContentLoaded', function() {
+        // Log fetch functionality
+        const logURL = "{{ url_for('log') }}";
+        const logOut = document.getElementById('logOut');
+        const autoscroll = document.getElementById('autoscroll');
+        
+        function updateLog() {
+            fetch(logURL)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    logOut.textContent = text;
+                    if (autoscroll.checked) {
+                        logOut.scrollTop = logOut.scrollHeight;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching log data:', error);
+                    logOut.textContent = 'Error loading log data. Please try refreshing the page.';
+                });
+        }
 
-    // Streaming
-    var streamingURL = "{{ url_for('streaming') }}";
-    var streamOut = document.getElementById('streamOut');
-    setInterval(function updateStreaming() {
+        // Streaming data fetch functionality
+        const streamingURL = "{{ url_for('streaming') }}";
+        const streamOut = document.getElementById('streamOut');
+        
+        function updateStreaming() {
+            fetch(streamingURL)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const contentType = response.headers.get("content-type");
+                    if (contentType && contentType.indexOf("application/json") !== -1) {
+                        return response.json();
+                    } else {
+                        return {};
+                    }
+                })
+                .then(json => {
+                    let html = '';
+                    let streamCount = 0;
 
-        fetch(streamingURL)
-            .then(function (response) {
-                return response.json();
-            })
-            .then(function (json) {
+                    for (var portalId in json) {
+                        if (!json[portalId] || json[portalId].length === 0) continue;
 
-                var codeBlock = ''
+                        for (const stream of json[portalId]) {
+                            streamCount++;
+                            const portalName = stream["portal name"] || portalId;
+                            const mac = stream["mac"]?.toUpperCase() || 'N/A';
+                            const client = stream["client"] || 'Unknown Client';
+                            const channel = stream["channel name"] || 'Unknown Channel';
+                            const start = stream["start time"] * 1000;
+                            const now = Date.now();
+                            const timeDifference = now - start;
 
-                for (var portal in json) {
-                    for (const stream of json[portal]) {
-                        var portal = stream["portal name"]
-                        var mac = stream["mac"].toUpperCase()
-                        var client = stream["client"]
-                        var channel = stream["channel name"]
-                        var start = stream["start time"] * 1000
-                        var now = Date.now()
-                        var timeDifference = now - start;
-                        var differenceDate = new Date(timeDifference);
-                        var diffHours = differenceDate.getUTCHours();
-                        var diffMinutes = differenceDate.getUTCMinutes();
-                        var diffSeconds = differenceDate.getUTCSeconds();
-                        var dur = String(diffHours).padStart(2, '0') + ':' + String(diffMinutes).padStart(2, '0') + ':' + String(diffSeconds).padStart(2, '0');
+                            let dur = '00:00:00';
+                            if (!isNaN(timeDifference) && timeDifference > 0) {
+                                const differenceDate = new Date(timeDifference);
+                                const diffHours = differenceDate.getUTCHours();
+                                const diffMinutes = differenceDate.getUTCMinutes();
+                                const diffSeconds = differenceDate.getUTCSeconds();
+                                dur = String(diffHours).padStart(2, '0') + ':' + String(diffMinutes).padStart(2, '0') + ':' + String(diffSeconds).padStart(2, '0');
+                            }
 
-                        // Storing HTML code block in a variable
-                        var codeBlock = codeBlock +
-                            '<div class="col">' +
-                            '<div class="card text-dark bg-light mb-3">' +
-                            '<div class="card-header"><i class="me-2 fa fa-user"></i>' + client + '</div>' +
-                            '<div class="card-body">' +
-                            '<table class="table table-sm">' +
-                            '<tr>' +
-                            '<td>' +
-                            '<i class="fa fa-play"></i>' +
-                            '</td>' +
-                            '<td>' +
-                            '<p class="card-text text-nowrap">' + channel + '</p>' +
-                            '</td>' +
-                            '</tr>' +
-                            '<tr>' +
-                            '<td>' +
-                            '<i class="fa fa-server"></i>' +
-                            '</td>' +
-                            '<td>' +
-                            '<p class="card-text text-nowrap">' + portal + '</p>' +
-                            '</td>' +
-                            '</tr>' +
-                            '<tr>' +
-                            '<td>' +
-                            '<i class="fa fa-lock"></i>' +
-                            '</td>' +
-                            '<td>' +
-                            '<p class="card-text text-nowrap">' + mac + '</p>' +
-                            '</td>' +
-                            '<tr>' +
-                            '<td>' +
-                            '<i class="fa fa-clock-o"></i>' +
-                            '</td>' +
-                            '<td>' +
-                            '<p class="card-text text-nowrap">' + dur + '</p>' +
-                            '</td>' +
-                            '</tr>' +
-                            '</table>' +
-                            '</div>' +
-                            '</div>' +
-                            '</div>';
+                            html += `
+                            <div class="col animate-slide-up">
+                                <div class="data-card">
+                                    <div class="card-header">
+                                        <div class="d-flex align-items-center">
+                                            <span class="status-indicator active me-2"></span>
+                                            <span class="text-truncate" title="${client}">${client}</span>
+                                        </div>
+                                        <span class="app-badge primary">${portalName}</span>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <ul class="list-group list-group-flush">
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                <span class="d-flex align-items-center">
+                                                    <i class="bi-play-fill me-2 text-success"></i>Channel
+                                                </span>
+                                                <span class="text-truncate text-end ms-2" title="${channel}" style="max-width: 150px;">${channel}</span>
+                                            </li>
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                <span class="d-flex align-items-center">
+                                                    <i class="bi-hdd-stack-fill me-2 text-muted"></i>MAC
+                                                </span>
+                                                <span class="mac-address">${mac}</span>
+                                            </li>
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                <span class="d-flex align-items-center">
+                                                    <i class="bi-clock-history me-2 text-muted"></i>Duration
+                                                </span>
+                                                <span class="app-badge neutral">${dur}</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>`;
+                        }
                     }
 
-                }
+                    if (streamCount === 0) {
+                        html = `
+                        <div class="col-12">
+                            <div class="app-card neutral text-center p-5">
+                                <div class="card-body">
+                                    <i class="bi-tv text-muted" style="font-size: 3rem;"></i>
+                                    <h4 class="mt-3">No Active Streams</h4>
+                                    <p class="text-muted">There are currently no active streaming sessions.</p>
+                                </div>
+                            </div>
+                        </div>`;
+                    }
 
-                // Inserting the code block to wrapper element
-                document.getElementById("streamOut").innerHTML = codeBlock
+                    streamOut.innerHTML = html;
+                })
+                .catch(error => {
+                    console.error("Error fetching streaming data:", error);
+                    streamOut.innerHTML = `
+                    <div class="col-12">
+                        <div class="app-alert danger">
+                            <i class="bi-exclamation-triangle-fill"></i>
+                            <div>Error loading stream data. Please try refreshing the page.</div>
+                        </div>
+                    </div>`;
+                });
+        }
 
-            })
-        return updateStreaming;
-    }(), 1000);
-
-
+        // Initial updates
+        updateLog();
+        updateStreaming();
+        
+        // Set intervals for periodic updates
+        setInterval(updateLog, 2000);
+        setInterval(updateStreaming, 1000);
+    });
 </script>
-
 {% endblock %}

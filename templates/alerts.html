@@ -1,44 +1,47 @@
 {% extends "base.html" %}
 
+{% block title %}Alerts - STB ReStreamer{% endblock %}
+
 {% block content %}
-<div class="container-fluid">
-    <!-- Header Section -->
-    <div class="header-section mb-4">
+<div class="container-fluid p-lg-5">
+    <!-- Page Header -->
+    <div class="page-header">
         <div class="d-flex justify-content-between align-items-center">
             <div>
-                <h3 class="mb-2"><i class="fa fa-bell"></i> System Alerts</h3>
-                <p class="text-muted mb-0">Monitor and track system alerts and notifications</p>
+                <h2 class="title"><i class="bi-bell-fill"></i> System Alerts</h2>
+                <p class="subtitle">Monitor and track system alerts and notifications</p>
             </div>
             <div class="filter-buttons">
                 <div class="btn-group">
-                    <button class="btn btn-dark active" onclick="filterAlerts('all')">
-                        <i class="fa fa-list"></i> All
+                    <button class="app-btn outline-dark active" onclick="filterAlerts('all')">
+                        <i class="bi-card-list"></i> All
                     </button>
-                    <button class="btn btn-dark" onclick="filterAlerts('error')">
-                        <i class="fa fa-exclamation-circle"></i> Errors
+                    <button class="app-btn outline-dark" onclick="filterAlerts('error')">
+                        <i class="bi-exclamation-circle-fill"></i> Errors
                     </button>
-                    <button class="btn btn-dark" onclick="filterAlerts('warning')">
-                        <i class="fa fa-exclamation-triangle"></i> Warnings
+                    <button class="app-btn outline-dark" onclick="filterAlerts('warning')">
+                        <i class="bi-exclamation-triangle-fill"></i> Warnings
                     </button>
                 </div>
             </div>
         </div>
+        <div class="divider"></div>
     </div>
 
     <!-- Stats Cards -->
     <div class="row g-3 mb-4">
         <div class="col-md-3">
-            <div class="stat-card error">
-                <div class="stat-card-content">
-                    <div class="stat-card-info">
-                        <h4 id="errorCount">0</h4>
-                        <p>Active Errors</p>
+            <div class="app-card danger">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h4 id="errorCount" class="m-0">0</h4>
+                            <p class="m-0 text-muted">Active Errors</p>
+                        </div>
+                        <div class="rounded-circle p-3" style="background-color: hsla(var(--danger-hsl), 0.1);">
+                            <i class="bi-exclamation-circle-fill text-danger"></i>
+                        </div>
                     </div>
-                    <div class="stat-card-icon">
-                        <i class="fa fa-exclamation-circle"></i>
-                    </div>
-                </div>
-                <div class="stat-card-progress">
                     <div class="progress">
                         <div class="progress-bar bg-danger" id="errorProgress" role="progressbar" style="width: 0%"></div>
                     </div>
@@ -46,17 +49,17 @@
             </div>
         </div>
         <div class="col-md-3">
-            <div class="stat-card warning">
-                <div class="stat-card-content">
-                    <div class="stat-card-info">
-                        <h4 id="warningCount">0</h4>
-                        <p>Active Warnings</p>
+            <div class="app-card warning">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h4 id="warningCount" class="m-0">0</h4>
+                            <p class="m-0 text-muted">Active Warnings</p>
+                        </div>
+                        <div class="rounded-circle p-3" style="background-color: hsla(var(--warning-hsl), 0.1);">
+                            <i class="bi-exclamation-triangle-fill text-warning"></i>
+                        </div>
                     </div>
-                    <div class="stat-card-icon">
-                        <i class="fa fa-exclamation-triangle"></i>
-                    </div>
-                </div>
-                <div class="stat-card-progress">
                     <div class="progress">
                         <div class="progress-bar bg-warning" id="warningProgress" role="progressbar" style="width: 0%"></div>
                     </div>
@@ -64,17 +67,17 @@
             </div>
         </div>
         <div class="col-md-3">
-            <div class="stat-card success">
-                <div class="stat-card-content">
-                    <div class="stat-card-info">
-                        <h4 id="resolvedCount">0</h4>
-                        <p>Resolved Issues</p>
+            <div class="app-card success">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h4 id="resolvedCount" class="m-0">0</h4>
+                            <p class="m-0 text-muted">Resolved Issues</p>
+                        </div>
+                        <div class="rounded-circle p-3" style="background-color: hsla(var(--success-hsl), 0.1);">
+                            <i class="bi-check-circle-fill text-success"></i>
+                        </div>
                     </div>
-                    <div class="stat-card-icon">
-                        <i class="fa fa-check-circle"></i>
-                    </div>
-                </div>
-                <div class="stat-card-progress">
                     <div class="progress">
                         <div class="progress-bar bg-success" id="resolvedProgress" role="progressbar" style="width: 0%"></div>
                     </div>
@@ -82,17 +85,17 @@
             </div>
         </div>
         <div class="col-md-3">
-            <div class="stat-card info">
-                <div class="stat-card-content">
-                    <div class="stat-card-info">
-                        <h4 id="totalCount">0</h4>
-                        <p>Total Alerts</p>
+            <div class="app-card info">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h4 id="totalCount" class="m-0">0</h4>
+                            <p class="m-0 text-muted">Total Alerts</p>
+                        </div>
+                        <div class="rounded-circle p-3" style="background-color: hsla(var(--info-hsl), 0.1);">
+                            <i class="bi-bell-fill text-info"></i>
+                        </div>
                     </div>
-                    <div class="stat-card-icon">
-                        <i class="fa fa-bell"></i>
-                    </div>
-                </div>
-                <div class="stat-card-progress">
                     <div class="progress">
                         <div class="progress-bar bg-info" id="totalProgress" role="progressbar" style="width: 100%"></div>
                     </div>
@@ -102,10 +105,10 @@
     </div>
 
     <!-- Alerts Table -->
-    <div class="card alerts-card">
+    <div class="app-card neutral">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table id="alertsTable" class="table table-hover align-middle mb-0">
+                <table id="alertsTable" class="data-table table-hover align-middle mb-0">
                     <thead>
                         <tr>
                             <th style="width: 180px;">Timestamp</th>
@@ -121,18 +124,18 @@
                         <tr class="alert-row" data-type="{{ alert.type }}" data-status="{{ alert.status }}" data-alert-id="{{ loop.index0 }}">
                             <td>
                                 <div class="d-flex align-items-center">
-                                    <div class="alert-indicator {{ alert.type }}"></div>
+                                    <span class="status-indicator {{ alert.type }}"></span>
                                     <span>{{ alert.timestamp }}</span>
                                 </div>
                             </td>
                             <td>
                                 {% if alert.type == 'error' %}
-                                <span class="alert-badge error">
-                                    <i class="fa fa-exclamation-circle"></i> Error
+                                <span class="app-badge danger">
+                                    <i class="bi-exclamation-circle-fill"></i> Error
                                 </span>
                                 {% elif alert.type == 'warning' %}
-                                <span class="alert-badge warning">
-                                    <i class="fa fa-exclamation-triangle"></i> Warning
+                                <span class="app-badge warning">
+                                    <i class="bi-exclamation-triangle-fill"></i> Warning
                                 </span>
                                 {% endif %}
                             </td>
@@ -144,19 +147,19 @@
                             </td>
                             <td>
                                 {% if alert.status == 'active' %}
-                                <span class="status-badge active">
-                                    <i class="fa fa-circle"></i> Active
+                                <span class="app-badge primary">
+                                    <i class="bi-circle-fill"></i> Active
                                 </span>
                                 {% else %}
-                                <span class="status-badge resolved">
-                                    <i class="fa fa-check-circle"></i> Resolved
+                                <span class="app-badge success">
+                                    <i class="bi-check-circle-fill"></i> Resolved
                                 </span>
                                 {% endif %}
                             </td>
                             <td>
                                 {% if alert.status == 'active' %}
-                                <button class="btn btn-resolve" onclick="resolveAlert({{ loop.index0 }})">
-                                    <i class="fa fa-check"></i> Resolve
+                                <button class="app-btn success sm" onclick="resolveAlert({{ loop.index0 }})">
+                                    <i class="bi-check-lg"></i> Resolve
                                 </button>
                                 {% endif %}
                             </td>
@@ -168,473 +171,110 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
-<style>
-/* Header Section */
-.header-section {
-    padding: 1.5rem 0;
-}
-
-.filter-buttons .btn-group {
-    background: var(--secondary-bg);
-    padding: 0.25rem;
-    border-radius: 12px;
-    border: 1px solid var(--border-light);
-}
-
-.filter-buttons .btn {
-    border: none;
-    padding: 0.5rem 1rem;
-    margin: 0 0.25rem;
-    border-radius: 8px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.filter-buttons .btn:hover,
-.filter-buttons .btn.active {
-    background: var(--accent-color);
-    color: white;
-}
-
-.filter-buttons .btn i {
-    margin-right: 0.5rem;
-}
-
-/* Stat Cards */
-.stat-card {
-    background: var(--secondary-bg);
-    border-radius: 12px;
-    border: 1px solid var(--border-light);
-    padding: 1.25rem;
-    height: 100%;
-    transition: all 0.2s ease;
-}
-
-.stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-}
-
-.stat-card-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-}
-
-.stat-card-info h4 {
-    font-size: 2rem;
-    font-weight: 600;
-    margin: 0;
-    line-height: 1;
-}
-
-.stat-card-info p {
-    margin: 0.5rem 0 0;
-    opacity: 0.7;
-    font-size: 0.9rem;
-}
-
-.stat-card-icon {
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 12px;
-    font-size: 1.5rem;
-}
-
-.stat-card.error .stat-card-icon {
-    background: rgba(220, 53, 69, 0.1);
-    color: #dc3545;
-}
-
-.stat-card.warning .stat-card-icon {
-    background: rgba(255, 193, 7, 0.1);
-    color: #ffc107;
-}
-
-.stat-card.success .stat-card-icon {
-    background: rgba(40, 167, 69, 0.1);
-    color: #28a745;
-}
-
-.stat-card.info .stat-card-icon {
-    background: rgba(23, 162, 184, 0.1);
-    color: #17a2b8;
-}
-
-.stat-card-progress .progress {
-    height: 6px;
-    background: var(--accent-bg);
-    border-radius: 3px;
-    overflow: hidden;
-}
-
-/* Alerts Table */
-.alerts-card {
-    border-radius: 12px;
-    border: 1px solid var(--border-light);
-    background: var(--secondary-bg);
-}
-
-.alert-row {
-    transition: all 0.2s ease;
-}
-
-.alert-row:hover {
-    background: var(--accent-bg) !important;
-}
-
-.alert-indicator {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-right: 0.75rem;
-}
-
-.alert-indicator.error {
-    background: #dc3545;
-}
-
-.alert-indicator.warning {
-    background: #ffc107;
-}
-
-.alert-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.4rem 0.8rem;
-    border-radius: 8px;
-    font-size: 0.875rem;
-    font-weight: 500;
-}
-
-.alert-badge i {
-    margin-right: 0.4rem;
-}
-
-.alert-badge.error {
-    background: rgba(220, 53, 69, 0.1);
-    color: #dc3545;
-}
-
-.alert-badge.warning {
-    background: rgba(255, 193, 7, 0.1);
-    color: #ffc107;
-}
-
-.status-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.4rem 0.8rem;
-    border-radius: 8px;
-    font-size: 0.875rem;
-    font-weight: 500;
-}
-
-.status-badge i {
-    margin-right: 0.4rem;
-    font-size: 0.75rem;
-}
-
-.status-badge.active {
-    background: rgba(220, 53, 69, 0.1);
-    color: #dc3545;
-}
-
-.status-badge.resolved {
-    background: rgba(40, 167, 69, 0.1);
-    color: #28a745;
-}
-
-.source-cell {
-    font-weight: 500;
-}
-
-.message-cell {
-    color: var(--secondary-text);
-}
-
-/* DataTables Styling to match editor */
-.dataTables_wrapper {
-    padding: 1rem;
-}
-
-.dataTables_wrapper .row {
-    align-items: center;
-    margin: 0;
-}
-
-.dataTables_length {
-    margin-right: 1rem;
-}
-
-.dataTables_length label {
-    margin: 0;
-    display: flex;
-    align-items: center;
-}
-
-.dataTables_length select {
-    background: var(--accent-bg);
-    border: 1px solid var(--border-light);
-    color: var(--primary-text);
-    border-radius: 8px;
-    padding: 0.5rem 2.5rem 0.5rem 1rem;
-    margin: 0 0.5rem;
-    cursor: pointer;
-    min-width: 80px;
-}
-
-.dataTables_filter input {
-    background: var(--accent-bg);
-    border: 1px solid var(--border-light);
-    color: var(--primary-text);
-    border-radius: 8px;
-    padding: 0.5rem 1rem;
-    margin-left: 0.5rem;
-    min-width: 200px;
-}
-
-.dataTables_info {
-    color: var(--secondary-text);
-    padding: 0.5rem 0;
-    font-size: 0.875rem;
-}
-
-.dataTables_paginate {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.25rem;
-}
-
-.dataTables_paginate .paginate_button {
-    background: var(--accent-bg) !important;
-    border: 1px solid var(--border-light) !important;
-    border-radius: 8px !important;
-    color: var(--primary-text) !important;
-    padding: 0.5rem 1rem !important;
-    margin: 0 2px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.dataTables_paginate .paginate_button:hover:not(.disabled) {
-    background: var(--accent-color) !important;
-    border-color: var(--accent-color) !important;
-    color: white !important;
-}
-
-.dataTables_paginate .paginate_button.current {
-    background: var(--accent-color) !important;
-    border-color: var(--accent-color) !important;
-    color: white !important;
-}
-
-.dataTables_paginate .paginate_button.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.table.dataTable {
-    margin: 1rem 0 !important;
-}
-
-.table > :not(caption) > * > * {
-    padding: 1rem;
-    background: none;
-}
-
-/* Fix for the resolve button */
-.btn-resolve {
-    background: var(--accent-bg);
-    border: 1px solid var(--border-light);
-    color: var(--primary-text);
-    padding: 0.4rem 0.8rem;
-    border-radius: 8px;
-    font-size: 0.875rem;
-    transition: all 0.2s ease;
-    cursor: pointer;
-}
-
-/* Success Toast */
-.toast-container {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 1050;
-}
-
-.toast {
-    background: var(--secondary-bg);
-    border: 1px solid var(--border-light);
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 0.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    opacity: 0;
-    transition: all 0.3s ease;
-}
-
-.toast.show {
-    opacity: 1;
-}
-
-.toast.success {
-    border-left: 4px solid #28a745;
-}
-
-.toast .icon {
-    color: #28a745;
-    font-size: 1.25rem;
-}
-
-.toast .message {
-    color: var(--primary-text);
-    font-size: 0.875rem;
-}
-</style>
-
-<div class="toast-container"></div>
-
+{% block scripts %}
 <script>
-$(document).ready(function() {
-    var table = $('#alertsTable').DataTable({
-        order: [[0, 'desc']],
-        pageLength: 25,
-        lengthMenu: [[25, 50, 100, 250, 500, 1000, -1], [25, 50, 100, 250, 500, 1000, "All"]],
-        dom: "<'row m-1'<'col-auto ms-auto'f><'col-auto'l>>" +
-             "<'row'<'col-12'tr>>" +
-             "<'row mb-1 mb-lg-0'<'col-auto text-light'i><'col-auto ms-auto'p>>",
-        language: {
-            search: "",
-            searchPlaceholder: "Filter",
-            lengthMenu: "_MENU_",
-            info: "_START_ to _END_ of _TOTAL_",
-            infoEmpty: "No alerts available",
-            infoFiltered: "(filtered from _MAX_)",
-            paginate: {
-                first: '<i class="fa fa-angle-double-left"></i>',
-                previous: '<i class="fa fa-angle-left"></i>',
-                next: '<i class="fa fa-angle-right"></i>',
-                last: '<i class="fa fa-angle-double-right"></i>'
+    document.addEventListener('DOMContentLoaded', function() {
+        updateAlertCounts();
+    });
+
+    // Filter alerts by type
+    function filterAlerts(type) {
+        const rows = document.querySelectorAll('.alert-row');
+        const filterButtons = document.querySelectorAll('.filter-buttons .app-btn');
+        
+        // Update active button state
+        filterButtons.forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.textContent.trim().toLowerCase().includes(type)) {
+                btn.classList.add('active');
             }
-        }
-    });
-
-    updateCounts();
-    
-    // Add active class to filter buttons on click
-    $('.filter-buttons .btn').click(function() {
-        $('.filter-buttons .btn').removeClass('active');
-        $(this).addClass('active');
-    });
-});
-
-function updateCounts() {
-    var errorCount = $('.alert-row[data-type="error"][data-status="active"]').length;
-    var warningCount = $('.alert-row[data-type="warning"][data-status="active"]').length;
-    var resolvedCount = $('.alert-row[data-status="resolved"]').length;
-    var totalCount = $('.alert-row').length;
-
-    // Update counts
-    $('#errorCount').text(errorCount);
-    $('#warningCount').text(warningCount);
-    $('#resolvedCount').text(resolvedCount);
-    $('#totalCount').text(totalCount);
-
-    // Update progress bars
-    var errorPercent = (errorCount / totalCount) * 100;
-    var warningPercent = (warningCount / totalCount) * 100;
-    var resolvedPercent = (resolvedCount / totalCount) * 100;
-
-    $('#errorProgress').css('width', errorPercent + '%');
-    $('#warningProgress').css('width', warningPercent + '%');
-    $('#resolvedProgress').css('width', resolvedPercent + '%');
-}
-
-function filterAlerts(type) {
-    var table = $('#alertsTable').DataTable();
-    
-    if (type === 'all') {
-        table.search('').draw();
-    } else {
-        table.search(type).draw();
+        });
+        
+        // Filter rows
+        rows.forEach(row => {
+            if (type === 'all' || row.getAttribute('data-type') === type) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
     }
-}
 
-function resolveAlert(alertId) {
-    // Send request to resolve the alert
-    fetch('/resolve_alert', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ alert_id: alertId })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Update the UI
-            const row = document.querySelector(`tr[data-alert-id="${alertId}"]`);
+    // Resolve alert
+    function resolveAlert(alertId) {
+        fetch(`/alerts/resolve/${alertId}`, { method: 'POST' })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    const row = document.querySelector(`[data-alert-id="${alertId}"]`);
+                    const statusCell = row.querySelector('td:nth-child(5)');
+                    const actionCell = row.querySelector('td:nth-child(6)');
+                    
+                    // Update status badge
+                    statusCell.innerHTML = `
+                        <span class="app-badge success">
+                            <i class="bi-check-circle-fill"></i> Resolved
+                        </span>
+                    `;
+                    
+                    // Remove action button
+                    actionCell.innerHTML = '';
+                    
+                    // Update row data attribute
+                    row.setAttribute('data-status', 'resolved');
+                    
+                    // Update counts
+                    updateAlertCounts();
+                }
+            })
+            .catch(error => {
+                console.error('Error resolving alert:', error);
+                alert('Error resolving alert. Please try again.');
+            });
+    }
+
+    // Update alert counts
+    function updateAlertCounts() {
+        const rows = document.querySelectorAll('.alert-row');
+        let totalCount = rows.length;
+        let errorCount = 0;
+        let warningCount = 0;
+        let resolvedCount = 0;
+        
+        rows.forEach(row => {
+            const type = row.getAttribute('data-type');
+            const status = row.getAttribute('data-status');
             
-            // Update status badge
-            const statusCell = row.querySelector('td:nth-child(5)');
-            statusCell.innerHTML = `
-                <span class="status-badge resolved">
-                    <i class="fa fa-check-circle"></i> Resolved
-                </span>
-            `;
-            
-            // Remove resolve button
-            const actionCell = row.querySelector('td:nth-child(6)');
-            actionCell.innerHTML = '';
-            
-            // Update row data attribute
-            row.setAttribute('data-status', 'resolved');
-            
-            // Update counts
-            updateCounts();
-            
-            // Show success toast
-            showToast('Alert resolved successfully', 'success');
+            if (status === 'active') {
+                if (type === 'error') {
+                    errorCount++;
+                } else if (type === 'warning') {
+                    warningCount++;
+                }
+            } else {
+                resolvedCount++;
+            }
+        });
+        
+        // Update count elements
+        document.getElementById('errorCount').textContent = errorCount;
+        document.getElementById('warningCount').textContent = warningCount;
+        document.getElementById('resolvedCount').textContent = resolvedCount;
+        document.getElementById('totalCount').textContent = totalCount;
+        
+        // Update progress bars
+        if (totalCount > 0) {
+            document.getElementById('errorProgress').style.width = `${(errorCount / totalCount) * 100}%`;
+            document.getElementById('warningProgress').style.width = `${(warningCount / totalCount) * 100}%`;
+            document.getElementById('resolvedProgress').style.width = `${(resolvedCount / totalCount) * 100}%`;
         }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showToast('Failed to resolve alert', 'error');
-    });
-}
-
-function showToast(message, type = 'success') {
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.innerHTML = `
-        <div class="icon">
-            <i class="fa fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
-        </div>
-        <div class="message">${message}</div>
-    `;
-    
-    document.querySelector('.toast-container').appendChild(toast);
-    
-    // Trigger reflow
-    toast.offsetHeight;
-    
-    // Show toast
-    toast.classList.add('show');
-    
-    // Remove toast after 3 seconds
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
+    }
 </script>
 {% endblock %}

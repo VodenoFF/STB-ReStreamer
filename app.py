@@ -1738,7 +1738,13 @@ def get_group(group_name):
     """
     channel_groups = getChannelGroups()
     if group_name in channel_groups:
-        return jsonify({"status": "success", "channels": channel_groups[group_name]}) # Return channels in group as JSON
+        # Get portals information to include in the response
+        portals = getPortals()
+        return jsonify({
+            "status": "success", 
+            "channels": channel_groups[group_name]["channels"],
+            "portals": portals
+        }) # Return channels in group and portal data as JSON
     return jsonify({"status": "error", "message": "Group not found"}), 404 # Return error status if group not found
 
 @app.route("/channels/add_channels", methods=["POST"])
@@ -1996,6 +2002,58 @@ def chplay(groupID):
 
 #region Alert Routes - Web UI and API
 
+@app.route("/groups", methods=["GET"])
+@authorise
+def get_groups():
+    """
+    API endpoint to get all channel groups.
+    """
+    channel_groups = getChannelGroups()
+    group_list = []
+    
+    for group_id, group_data in channel_groups.items():
+        group_info = {
+            "id": group_id,
+            "name": group_id,
+            "icon": group_data.get("icon", "bi-collection-fill"),
+            "channels": []
+        }
+        
+        # Add the channel count directly
+        channels = group_data.get("channels", [])
+        group_info["channels"] = len(channels)
+        
+        group_list.append(group_info)
+    
+    return jsonify(group_list)
+
+@app.route("/group/<group_id>/channels", methods=["GET"])
+@authorise
+def get_group_channels(group_id):
+    """
+    API endpoint to get channels in a specific group.
+    """
+    channel_groups = getChannelGroups()
+    
+    if group_id not in channel_groups:
+        return jsonify([])
+    
+    group_data = channel_groups[group_id]
+    channel_list = []
+    
+    if "channels" in group_data:
+        for idx, channel in enumerate(group_data["channels"]):
+            channel_info = {
+                "id": channel.get("channelId", ""),
+                "name": channel.get("channelName", "Unknown Channel"),
+                "logo": f"/static/logos/{channel.get('channelId')}.png",
+                "category": channel.get("category", ""),
+                "position": idx
+            }
+            channel_list.append(channel_info)
+    
+    return jsonify(channel_list)
+
 @app.route("/alerts", methods=["GET"])
 @authorise
 def alerts():
@@ -2075,3 +2133,231 @@ if __name__ == "__main__":
         waitress.serve(app, port=8001, _quiet=True, threads=12) # Run using Waitress WSGI server in production mode
 
 #endregion
+
+@app.route("/channels/add_channel", methods=["POST"])
+@authorise
+def add_channel():
+    """
+    Adapter API endpoint to add a single channel to a channel group.
+    Converts the new API format to the old one.
+    """
+    data = request.get_json() # Get JSON data from request
+    group_name = data.get("group") # Get group name from JSON data
+    portal_id = data.get("portal") # Get portal ID from JSON data
+    channel_id = data.get("channel") # Get channel ID from JSON data
+    
+    # Adapt format for the older add_channels endpoint
+    adapted_data = {
+        "group_name": group_name,
+        "portal": portal_id,
+        "channels": channel_id
+    }
+    
+    # Call the original add_channels function (from line 1750)
+    # We need to modify the request context
+    with app.test_request_context(
+        '/channels/add_channels', 
+        method='POST',
+        json=adapted_data
+    ) as ctx:
+        # Process the request
+        response = add_channels()
+        
+        # Convert the response status field to success field
+        if isinstance(response, tuple):
+            data, status_code = response
+            return response
+        
+        data = response.get_json()
+        if data.get("status") == "success":
+            return jsonify({"success": True})
+        else:
+            return jsonify({"success": False, "message": data.get("message", "Unknown error")}), 400
+
+@app.route("/channels/move_channel", methods=["POST"])
+@authorise
+def move_channel():
+    """
+    API endpoint to move a channel up or down in a group.
+    Uses the channel reorder endpoint to achieve the same functionality.
+    """
+    data = request.get_json() # Get JSON data from request
+    group_name = data.get("group") # Get group name from JSON data
+    index = data.get("index") # Get channel index
+    direction = data.get("direction") # Get move direction (up/down)
+
+    if not all([group_name, index is not None, direction]):
+        return jsonify({"success": False, "message": "Missing required parameters"}), 400
+
+    channel_groups = getChannelGroups()
+    if group_name not in channel_groups:
+        return jsonify({"success": False, "message": "Group not found"}), 404
+
+    channels = channel_groups[group_name]["channels"]
+    if not channels or index < 0 or index >= len(channels):
+        return jsonify({"success": False, "message": "Invalid channel index"}), 400
+
+    # Move channel up or down based on direction
+    if direction == "up" and index > 0:
+        channels[index], channels[index-1] = channels[index-1], channels[index]
+    elif direction == "down" and index < len(channels) - 1:
+        channels[index], channels[index+1] = channels[index+1], channels[index]
+    else:
+        return jsonify({"success": False, "message": "Cannot move channel in that direction"}), 400
+
+    # Call the reorder endpoint with the modified channels list
+    with app.test_request_context(
+        '/channels/reorder', 
+        method='POST',
+        json={
+            "group_name": group_name,
+            "channels": channels
+        }
+    ) as ctx:
+        # Process the request
+        response = reorder_channels()
+        
+        # Convert the response status field to success field
+        if isinstance(response, tuple):
+            return jsonify({"success": False, "message": "Reordering failed"}), 400
+        
+        data = response.get_json()
+        if data.get("status") == "success":
+            return jsonify({"success": True})
+        else:
+            return jsonify({"success": False, "message": data.get("message", "Unknown error")}), 400
+
+@app.route("/channels/create_group", methods=["POST"])
+@authorise
+def create_group_alt():
+    """
+    Adapter API endpoint to create a new channel group.
+    Converts the new API format to the old one.
+    """
+    data = request.get_json() # Get JSON data from request
+    group_name = data.get("group") # Get group name from JSON data
+
+    # Call the original create_group function with adapted data
+    with app.test_request_context(
+        '/channels/create', 
+        method='POST',
+        json={"group_name": group_name}
+    ) as ctx:
+        # Process the request
+        response = create_group()
+        
+        # Convert the response status field to success field
+        if isinstance(response, tuple):
+            return jsonify({"success": False, "message": "Group creation failed"}), 400
+        
+        data = response.get_json()
+        if data.get("status") == "success":
+            return jsonify({"success": True})
+        else:
+            return jsonify({"success": False, "message": data.get("message", "Unknown error")}), 400
+
+@app.route("/channels/reorder_channels", methods=["POST"])
+@authorise
+def reorder_channels_new():
+    """
+    Adapter API endpoint to reorder channels within a channel group using indexes.
+    Converts the new API format to the old one.
+    """
+    data = request.get_json() # Get JSON data from request
+    group_name = data.get("group") # Get group name from JSON data
+    indexes = data.get("indexes", []) # Get channel indexes in new order
+
+    if not group_name or not indexes:
+        return jsonify({"success": False, "message": "Missing required parameters"}), 400
+
+    channel_groups = getChannelGroups()
+    if group_name not in channel_groups:
+        return jsonify({"success": False, "message": "Group not found"}), 404
+
+    channels = channel_groups[group_name]["channels"]
+    if len(indexes) != len(channels):
+        return jsonify({"success": False, "message": "Invalid indexes list length"}), 400
+
+    # Create a new ordered list of channels based on the provided indexes
+    new_channels = []
+    for idx in indexes:
+        if idx < 0 or idx >= len(channels):
+            return jsonify({"success": False, "message": f"Invalid index: {idx}"}), 400
+        new_channels.append(channels[idx])
+
+    # Call the original reorder_channels function with adapted data
+    with app.test_request_context(
+        '/channels/reorder', 
+        method='POST',
+        json={
+            "group_name": group_name,
+            "channels": new_channels
+        }
+    ) as ctx:
+        # Process the request
+        response = reorder_channels()
+        
+        # Convert the response status field to success field
+        if isinstance(response, tuple):
+            return jsonify({"success": False, "message": "Reordering failed"}), 400
+        
+        data = response.get_json()
+        if data.get("status") == "success":
+            return jsonify({"success": True})
+        else:
+            return jsonify({"success": False, "message": data.get("message", "Unknown error")}), 400
+
+@app.route("/channels/delete_group", methods=["POST"])
+@authorise
+def delete_group():
+    """
+    Adapter API endpoint to delete a channel group.
+    """
+    data = request.get_json() # Get JSON data from request
+    group_name = data.get("group") # Get group name from JSON data
+    
+    # Call the original delete_channel_group function with adapted data
+    with app.test_request_context(
+        '/channels/delete', 
+        method='POST',
+        json={"group_name": group_name}
+    ) as ctx:
+        # Process the request
+        response = delete_channel_group()
+        
+        # Convert the response status field to success field
+        if isinstance(response, tuple):
+            return jsonify({"success": False, "message": "Group deletion failed"}), 400
+        
+        data = response.get_json()
+        if data.get("status") == "success":
+            return jsonify({"success": True})
+        else:
+            return jsonify({"success": False, "message": data.get("message", "Unknown error")}), 400
+
+@app.route("/channels/rename_group", methods=["POST"])
+@authorise
+def rename_group():
+    """
+    API endpoint to rename a channel group.
+    """
+    data = request.get_json() # Get JSON data from request
+    old_name = data.get("old_name") # Get old group name from JSON data
+    new_name = data.get("new_name") # Get new group name from JSON data
+    
+    if not old_name or not new_name:
+        return jsonify({"success": False, "message": "Old and new group names are required"}), 400
+        
+    channel_groups = getChannelGroups()
+    if old_name not in channel_groups:
+        return jsonify({"success": False, "message": "Group not found"}), 404
+        
+    if new_name in channel_groups:
+        return jsonify({"success": False, "message": "New group name already exists"}), 400
+        
+    # Copy group data to new name and delete old one
+    channel_groups[new_name] = channel_groups[old_name]
+    del channel_groups[old_name]
+    saveChannelGroups(channel_groups)
+    
+    return jsonify({"success": True})

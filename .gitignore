@@ -67,3 +67,5 @@ tmp/
 *.bak
 *~
 *.backup 
+.cursorrules
+.cursor/

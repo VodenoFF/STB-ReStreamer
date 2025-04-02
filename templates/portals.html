@@ -1,231 +1,343 @@
 {% extends "base.html" %}
+
+{% block head %}
+<title>Portals - STB ReStreamer</title>
+{% endblock %}
+
 {% block content %}
-
 <div class="container-fluid p-lg-5">
-
-    <div>
-        <button class="btn btn-success btn-block" title="Add Portal" data-bs-toggle="modal"
-            data-bs-target="#modalAdd"><i class="fa fa-plus"></i> Add Portal</button>
+    <div class="row mb-4">
+        <div class="col-12 d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="text-gradient mb-2">Portals</h2>
+                <p class="text-muted">Manage your IPTV portal connections</p>
+            </div>
+            <button class="btn btn-success animate-pulse" data-bs-toggle="modal" data-bs-target="#modalAdd">
+                <i class="bi-plus-lg me-2"></i>Add Portal
+            </button>
+        </div>
+        <div class="col-12">
+            <hr class="opacity-25 mb-4">
+        </div>
     </div>
 
-    <br>
-
-    <div class="row row-cols-auto" id="streamOut">
-
-
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 stagger-animation">
         {% if portals is not none %}
-        {% for portal in portals %}
-
-        <div class="col">
-
-            <div class="card mb-3">
-                <div class="card-header btn text-start stretched-link" data-id="{{ portal }}"
-                    data-enabled="{{ portals[portal].enabled }}" data-name="{{ portals[portal].name }}"
-                    data-url="{{ portals[portal].url }}" data-proxy="{{ portals[portal].proxy }}"
-                    data-macs="{{ portals[portal].macs|join(',') }}"
-                    data-streamsPerMac="{{ portals[portal]['streams per mac'] }}" data-bs-toggle="modal"
-                    data-bs-target="#modalEdit">
-                    <i class="me-2 fa fa-server"{{ "hidden" if portals[portal].enabled =='false' }}></i>
-                    <i class="me-2 fa fa-ban"{{ "hidden" if portals[portal].enabled =='true' }}></i>
-                    {{ portals[portal].name }}
+            {% for portal_id, portal_data in portals.items() %}
+                <div class="col">
+                    <div class="card card-interactive h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                {% if portal_data.enabled == 'true' %}
+                                    <span class="status-indicator status-active me-2" title="Portal Active"></span>
+                                {% else %}
+                                    <span class="status-indicator status-inactive me-2" title="Portal Disabled"></span>
+                                {% endif %}
+                                
+                                <a href="{{ url_for('channels_endpoint') }}?portal={{ portal_id }}" 
+                                   class="text-decoration-none text-reset fw-medium text-truncate" 
+                                   title="{{ portal_data.name }}">
+                                    {{ portal_data.name }}
+                                </a>
+                            </div>
+                            
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-icon btn-outline-secondary" 
+                                        title="Edit Portal"
+                                        data-id="{{ portal_id }}"
+                                        data-enabled="{{ portal_data.enabled }}" 
+                                        data-name="{{ portal_data.name }}"
+                                        data-url="{{ portal_data.url }}" 
+                                        data-proxy="{{ portal_data.proxy }}"
+                                        data-macs="{{ portal_data.macs|join(',') }}"
+                                        data-streamsPerMac="{{ portal_data['streams per mac'] }}" 
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modalEdit">
+                                    <i class="bi-pencil-fill"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th class="ps-3">MAC Address</th>
+                                            <th>Expiry</th>
+                                            <th class="pe-3 text-end">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for mac, expiry in portal_data.macs.items() %}
+                                            <tr class="expiry-row" data-expiry="{{ expiry }}">
+                                                <td class="ps-3"><span class="mac-address">{{ mac.upper() }}</span></td>
+                                                <td><span class="expiry-date" name="expiryString">{{ expiry }}</span></td>
+                                                <td class="pe-3 text-end expiry-status"></td>
+                                            </tr>
+                                        {% else %}
+                                            <tr>
+                                                <td colspan="3" class="text-muted ps-3">
+                                                    <div class="d-flex justify-content-center align-items-center py-3">
+                                                        <i class="bi-exclamation-circle me-2"></i>
+                                                        No MAC addresses configured.
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div class="card-footer bg-transparent d-flex justify-content-between align-items-center">
+                            <small class="text-muted">Streams per MAC: {{ portal_data['streams per mac'] }}</small>
+                            <a href="{{ portal_data.url }}" target="_blank" class="btn btn-sm btn-icon btn-outline-primary" title="Open Portal URL">
+                                <i class="bi-box-arrow-up-right"></i>
+                            </a>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <table class="table table-sm mt-2">
-                        {% for key, value in portals[portal].macs.items() %}
-                        <tr>
-                            <td><span class="mac-address">{{key.upper()}}</span></td>
-                            <td><span>:</span></td>
-                            <td><span class="expiry-date" name="expiryString">{{value}}</span></td>
-                        </tr>
-                        {% endfor %}
-                    </table>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="card card-neumorphic text-center p-5">
+                    <div class="card-body">
+                        <i class="bi-server text-muted" style="font-size: 3rem;"></i>
+                        <h4 class="mt-3">No Portals Configured</h4>
+                        <p class="text-muted">Add your first portal to get started</p>
+                        <button class="btn btn-success mt-3" data-bs-toggle="modal" data-bs-target="#modalAdd">
+                            <i class="bi-plus-lg me-2"></i>Add Portal
+                        </button>
+                    </div>
                 </div>
             </div>
-
-        </div>
-
-        {% endfor %}
         {% endif %}
-
     </div>
-
 </div>
 
-
-<!-- Add Modal -->
-<div class="modal fade text-dark" id="modalAdd" tabindex="-1">
+<!-- Add Portal Modal -->
+<div class="modal fade" id="modalAdd" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Add Portal</h5>
+                <h5 class="modal-title" id="addModalLabel">
+                    <i class="bi-plus-circle me-2 text-success"></i>Add Portal
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-
-                <form action="/portal/add" method="post">
-
-                    <h6>Name:</h6>
-                    <input type="text" name="name" class="form-control flex-fill" title="Name" required>
-                    <span class="text-muted">Give this portal a name.</span>
-
-                    <br><br>
-
-                    <h6>URL:</h6>
-                    <input type="text" name="url" class="form-control flex-fill" title="URL" required>
-                    <span class="text-muted">Its best to enter the full address ending in .php if you know
-                        it.<br>If
-                        not STB-Proxy will attempt to figure it out for you.</span>
-
-                    <br><br>
-
-                    <h6>Proxy:</h6>
-                    <input type="text" name="proxy" class="form-control flex-fill" title="Proxy">
-                    <span class="text-muted">STB-Proxy supports HTML proxies only.</span>
-
-                    <br><br>
-
-                    <h6>MACs:</h6>
-                    <input type="text" name="macs" class="form-control flex-fill" title="MACs" required>
-                    <span class="text-muted">Enter a comma seperated list of MAC adresses.</span>
-
-                    <br><br>
-
-                    <h6>Streams Per MAC:</h6>
-                    <input type="number" name="streams per mac" class="form-control flex-fill" title="Streams Per Mac"
-                        min="0" value="1" required>
-                    <span class="text-muted">How many streams does each MAC allow. 0 = unlimited.</span>
-
-                    <br><br>
-
-                    <div class="modal-footer">
-                        <button class="btn btn-secondary" title="Cancel" data-bs-dismiss="modal">Cancel</button>
-                        <button class="btn btn-success btn-block" title="Add">Add</button>
+                <form action="/portal/add" method="post" id="addPortalForm">
+                    <div class="mb-3">
+                        <div class="form-floating">
+                            <input type="text" id="addName" name="name" class="form-control" required placeholder="Portal Name">
+                            <label for="addName">Portal Name</label>
+                        </div>
+                        <div class="form-text">Give this portal a unique name for easy identification.</div>
                     </div>
 
-                </form>
+                    <div class="mb-3">
+                        <div class="form-floating">
+                            <input type="url" id="addUrl" name="url" class="form-control" required 
+                                placeholder="http://portal.example.com/c/">
+                            <label for="addUrl">Portal URL</label>
+                        </div>
+                        <div class="form-text">Full portal address ending in /c/ or .php is recommended.</div>
+                    </div>
 
+                    <div class="mb-3">
+                        <div class="form-floating">
+                            <input type="text" id="addProxy" name="proxy" class="form-control" 
+                                placeholder="http://proxy.example.com:8080">
+                            <label for="addProxy">HTTP Proxy (Optional)</label>
+                        </div>
+                        <div class="form-text">Optional HTTP/S proxy address for portal connection.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-floating">
+                            <input type="text" id="addMacs" name="macs" class="form-control" required 
+                                placeholder="00:1A:79:XX:XX:XX,00:1A:79:YY:YY:YY">
+                            <label for="addMacs">MAC Addresses</label>
+                        </div>
+                        <div class="form-text">Comma-separated list of MAC addresses for this portal.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-floating">
+                            <input type="number" id="addStreamsPerMac" name="streams per mac" class="form-control" 
+                                min="0" value="1" required placeholder="1">
+                            <label for="addStreamsPerMac">Streams Per MAC</label>
+                        </div>
+                        <div class="form-text">Maximum concurrent streams per MAC (0 = unlimited).</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer d-flex justify-content-end">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="addPortalForm" class="btn btn-success">
+                    <i class="bi-plus-lg me-2"></i>Add Portal
+                </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Edit Modal -->
-<div class="modal fade text-dark" id="modalEdit" tabindex="-1">
+<!-- Edit Portal Modal -->
+<div class="modal fade" id="modalEdit" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Edit Portal</h5>
-                <div class="form-check form-switch ms-auto">
-                    <input type="checkbox" form="update" class="checkbox form-check-input" name="enabled" id="editEnabled"
-                        value="true">
-                </div>
+                <h5 class="modal-title" id="editModalLabel">
+                    <i class="bi-pencil-square me-2 text-primary"></i>Edit Portal
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-
-                <form id="update" action="/portal/update" method="post">
-
-                    <input name="id" id="editId" hidden>
+                <form id="updateForm" action="/portal/update" method="post">
+                    <input name="id" id="editId" type="hidden">
                     <input type="checkbox" name="retest" id="retest" value="true" hidden>
 
-                    <h6>Name:</h6>
-                    <input type="text" name="name" id="editName" class="form-control flex-fill" title="Name" required>
-                    <span class="text-muted">Give this portal a name.</span>
-
-                    <br><br>
-
-                    <h6>URL:</h6>
-                    <input type="text" name="url" id="editUrl" class="form-control flex-fill" title="URL" required>
-                    <span class="text-muted">Its best to enter the full address ending in .php if you know
-                        it.<br>If
-                        not STB-Proxy will attempt to figure it out for you.</span>
-
-                    <br><br>
-
-                    <h6>Proxy:</h6>
-                    <input type="text" name="proxy" id="editProxy" class="form-control flex-fill" title="Proxy">
-                    <span class="text-muted">STB-Proxy supports HTML proxies only.</span>
-
-                    <br><br>
-
-                    <h6>MACs:</h6>
-                    <input type="text" name="macs" id="editMacs" class="form-control flex-fill" title="MACs" required>
-                    <span class="text-muted">Enter a comma seperated list of MAC adresses.</span>
-
-                    <br><br>
-
-                    <h6>Streams Per MAC:</h6>
-                    <input type="number" name="streams per mac" id="editStreamsPerMac" class="form-control flex-fill"
-                        title="Streams Per MAC" min="0" required>
-                    <span class="text-muted">How many streams does each MAC allow. 0 = unlimited.</span>
-
-                    <br><br>
-
-                    <div class="modal-footer">
-                        <button class="btn btn-danger me-auto" title="Delete" form="delete"
-                            id="deleteName">Delete</button>
-                        <button class="btn btn-secondary" title="Cancel" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-success" title="Retest" onclick="retestSave()">Retest</button>
-                        <button class="btn btn-success" title="Save">Save</button>
+                    <div class="form-check form-switch mb-4">
+                        <input type="checkbox" class="form-check-input" name="enabled" id="editEnabled" value="true">
+                        <label class="form-check-label" for="editEnabled">Enable this portal</label>
                     </div>
 
+                    <div class="mb-3">
+                        <div class="form-floating">
+                            <input type="text" id="editName" name="name" class="form-control" required placeholder="Portal Name">
+                            <label for="editName">Portal Name</label>
+                        </div>
+                        <div class="form-text">Give this portal a unique name for easy identification.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-floating">
+                            <input type="url" id="editUrl" name="url" class="form-control" required placeholder="http://portal.example.com/c/">
+                            <label for="editUrl">Portal URL</label>
+                        </div>
+                        <div class="form-text">Full portal address ending in /c/ or .php is recommended.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-floating">
+                            <input type="text" id="editProxy" name="proxy" class="form-control" placeholder="http://proxy.example.com:8080">
+                            <label for="editProxy">HTTP Proxy (Optional)</label>
+                        </div>
+                        <div class="form-text">Optional HTTP/S proxy address for portal connection.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-floating">
+                            <input type="text" id="editMacs" name="macs" class="form-control" required 
+                                  placeholder="00:1A:79:XX:XX:XX,00:1A:79:YY:YY:YY">
+                            <label for="editMacs">MAC Addresses</label>
+                        </div>
+                        <div class="form-text">Comma-separated list of MAC addresses for this portal.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-floating">
+                            <input type="number" id="editStreamsPerMac" name="streams per mac" class="form-control" 
+                                  min="0" required placeholder="1">
+                            <label for="editStreamsPerMac">Streams Per MAC</label>
+                        </div>
+                        <div class="form-text">Maximum concurrent streams per MAC (0 = unlimited).</div>
+                    </div>
                 </form>
 
-                <form id="delete" action="/portal/remove" method="post" onsubmit="return confirm('Confirm Delete');"
-                    hidden>
-                    <input type="text" name="deleteId" id="deleteId" value="">
+                <form id="deleteForm" action="/portal/remove" method="post" hidden>
+                    <input type="hidden" name="deleteId" id="deleteId">
                 </form>
-
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+                <button type="button" class="btn btn-danger" id="deleteButton">
+                    <i class="bi-trash-fill me-2"></i>Delete
+                </button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-info" onclick="retestSave()">
+                        <i class="bi-arrow-repeat me-2"></i>Test Connection
+                    </button>
+                    <button type="submit" form="updateForm" class="btn btn-primary">
+                        <i class="bi-check-lg me-2"></i>Save Changes
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set expiry status when page loads
+        setExpiryStatus();
+        
+        // Set up edit modal
+        document.querySelectorAll('[data-bs-target="#modalEdit"]').forEach(function(button) {
+            button.addEventListener('click', function() {
+                const id = this.dataset.id;
+                const enabled = this.dataset.enabled;
+                const name = this.dataset.name;
+                const url = this.dataset.url;
+                const proxy = this.dataset.proxy;
+                const macs = this.dataset.macs;
+                const streamsPerMac = this.dataset.streamsPerMac;
+                
+                document.getElementById('editId').value = id;
+                document.getElementById('deleteId').value = id;
+                document.getElementById('editEnabled').checked = (enabled === 'true');
+                document.getElementById('editName').value = name;
+                document.getElementById('editUrl').value = url;
+                document.getElementById('editProxy').value = proxy;
+                document.getElementById('editMacs').value = macs;
+                document.getElementById('editStreamsPerMac').value = streamsPerMac;
+            });
+        });
+        
+        // Delete button confirmation
+        document.getElementById('deleteButton').addEventListener('click', function() {
+            if (confirm('Are you sure you want to delete this portal? This action cannot be undone.')) {
+                document.getElementById('deleteForm').submit();
+            }
+        });
+    });
 
-    var now = Date.now();
-    var expiries = document.getElementsByName("expiryString");
-    for (i in expiries) {
-        var expires = Date.parse(expiries[i].innerText);
-        var diff = expires - now;
-        var daysAway = diff / (1000 * 3600 * 24);
-        if (now > expires) {
-            expiries[i].parentElement.parentElement.classList.add("table-danger");
-        } else if (daysAway < 30) {
-            expiries[i].parentElement.parentElement.classList.add("table-warning");
-        }
+    function setExpiryStatus() {
+        const now = Date.now();
+        const expiryRows = document.querySelectorAll(".expiry-row");
+        
+        expiryRows.forEach(row => {
+            const expiryDateString = row.dataset.expiry;
+            const expiryStatusCell = row.querySelector('.expiry-status');
+            if (!expiryDateString || !expiryStatusCell) return;
 
+            const expires = Date.parse(expiryDateString);
+            if (isNaN(expires)) {
+                expiryStatusCell.innerHTML = '<span class="badge bg-secondary">Invalid</span>';
+                return;
+            }
+
+            const diff = expires - now;
+            const daysAway = diff / (1000 * 3600 * 24);
+
+            if (diff < 0) {
+                row.classList.add("table-danger");
+                expiryStatusCell.innerHTML = '<span class="badge bg-danger">Expired</span>';
+            } else if (daysAway < 7) {
+                row.classList.add("table-warning");
+                expiryStatusCell.innerHTML = '<span class="badge bg-warning text-dark">Expiring Soon</span>';
+            } else {
+                expiryStatusCell.innerHTML = '<span class="badge bg-success">Active</span>';
+            }
+        });
     }
-
-    var editModal = document.getElementById('modalEdit');
-    editModal.addEventListener('show.bs.modal', function (event) {
-        var button = event.relatedTarget;
-        var id = button.getAttribute('data-id');
-        var enabled = button.getAttribute('data-enabled');
-        var name = button.getAttribute('data-name');
-        var url = button.getAttribute('data-url');
-        var proxy = button.getAttribute('data-proxy');
-        var macs = button.getAttribute('data-macs');
-        var streamsPerMac = button.getAttribute('data-streamsPerMac');
-        document.getElementById('editId').value = id;
-        if (enabled == "true") {
-            document.getElementById('editEnabled').checked = true;
-        } else {
-            document.getElementById('editEnabled').checked = false;
-        }
-        document.getElementById('editName').value = name;
-        document.getElementById('editUrl').value = url;
-        document.getElementById('editProxy').value = proxy;
-        document.getElementById('editMacs').value = macs;
-        document.getElementById('editStreamsPerMac').value = streamsPerMac;
-        document.getElementById('deleteId').value = id;
-        document.getElementById('deleteName').value = name;
-        document.getElementById('retest').checked = false;
-    })
 
     function retestSave() {
         document.getElementById('retest').checked = true;
-        document.getElementById("update").submit();
+        document.getElementById('updateForm').submit();
     }
-
 </script>
-
 {% endblock %}

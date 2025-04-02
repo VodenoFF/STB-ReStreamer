@@ -1,490 +1,209 @@
 <!DOCTYPE html>
-<html data-bs-theme="dark">
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="en" data-bs-theme="dark">
 
 <head>
-    <title>STB ReStreamer</title>
-    <link rel="shortcut icon" type="image/png" href="../static/tv.png" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <link rel="stylesheet" type="text/css"
-        href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" />
-    <link rel="stylesheet" type="text/css"
-        href="https://cdn.datatables.net/v/bs5/jq-3.6.0/dt-1.11.3/b-2.0.1/datatables.min.css" />
-    <script type="text/javascript"
-        src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
-    <script type="text/javascript"
-        src="https://cdn.datatables.net/v/bs5/jq-3.6.0/dt-1.11.3/b-2.0.1/datatables.min.js"></script>
-    <style>
-        :root {
-            --primary-bg: #1a1d21;
-            --secondary-bg: #22262a;
-            --accent-bg: #2a2f35;
-            --primary-text: #ffffff;
-            --secondary-text: #b4bac3;
-            --accent-color: #3a7bfd;
-            --border-color: #32363c;
-            --border-light: rgba(255, 255, 255, 0.1);
-        }
-
-        body {
-            background-color: var(--primary-bg);
-            color: var(--primary-text);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-        }
-
-        /* Add border to main container */
-        .container-fluid {
-            border: 1px solid var(--border-light);
-            border-radius: 12px;
-            padding: 20px;
-            margin: 20px auto;
-            background: var(--secondary-bg);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .navbar {
-            background: var(--secondary-bg) !important;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            backdrop-filter: blur(10px);
-            border: 1px solid var(--border-light);
-            border-radius: 10px;
-        }
-
-        .navbar-brand {
-            font-weight: 600;
-            color: var(--primary-text) !important;
-            padding: 8px 16px;
-            border-radius: 8px;
-            border: 1px solid transparent;
-        }
-
-        .navbar-brand:hover {
-            border-color: var(--border-light);
-            background: var(--accent-bg);
-        }
-
-        .nav-link {
-            color: var(--secondary-text) !important;
-            transition: all 0.2s ease;
-            border-radius: 6px;
-            padding: 0.5rem 1rem !important;
-            margin: 0 0.2rem;
-            border: 1px solid transparent;
-        }
-
-        .nav-link:hover {
-            color: var(--primary-text) !important;
-            background: var(--accent-bg);
-            border-color: var(--border-light);
-        }
-
-        .card {
-            background: var(--secondary-bg);
-            border: 1px solid var(--border-light);
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            color: var(--primary-text);
-        }
-
-        .card-header {
-            border-bottom: 1px solid var(--border-light);
-            background: var(--accent-bg);
-            padding: 1rem;
-            color: var(--primary-text);
-        }
-
-        .card-footer {
-            border-top: 1px solid var(--border-light);
-            background: var(--accent-bg);
-            padding: 1rem;
-        }
-
-        .modal-content {
-            background: var(--secondary-bg);
-            border: 1px solid var(--border-light);
-            border-radius: 12px;
-            color: var(--primary-text);
-        }
-
-        .modal-header {
-            border-bottom: 1px solid var(--border-light);
-            padding: 1rem 1.5rem;
-        }
-
-        .modal-footer {
-            border-top: 1px solid var(--border-light);
-            padding: 1rem 1.5rem;
-        }
-
-        .form-control, .form-select {
-            background: var(--accent-bg);
-            border: 1px solid var(--border-light);
-            color: var(--primary-text);
-            border-radius: 8px;
-            transition: all 0.2s ease;
-        }
-
-        .form-control:focus, .form-select:focus {
-            background: var(--accent-bg);
-            border-color: var(--accent-color);
-            box-shadow: 0 0 0 2px rgba(58, 123, 253, 0.2);
-            color: var(--primary-text);
-        }
-
-        .input-group {
-            border: 1px solid var(--border-light);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .input-group-text {
-            background: var(--accent-bg);
-            border: none;
-            color: var(--secondary-text);
-        }
-
-        .btn {
-            border-radius: 8px;
-            padding: 0.5rem 1.2rem;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            border: 1px solid var(--border-light);
-        }
-
-        .btn-primary {
-            background: var(--accent-color);
-            border-color: var(--accent-color);
-        }
-
-        .btn-primary:hover {
-            background: #4a87fd;
-            transform: translateY(-1px);
-            border-color: #4a87fd;
-        }
-
-        .btn-secondary {
-            background-color: #30363d;
-            border-color: #30363d;
-            color: #e6edf3;
-            opacity: 0.9;
-        }
-
-        .btn-secondary:hover {
-            background-color: #3c444d;
-            border-color: #3c444d;
-            opacity: 1;
-        }
-
-        .btn-success {
-            background-color: #238636;
-            border-color: #238636;
-            color: #e6edf3;
-            opacity: 0.9;
-        }
-
-        .btn-success:hover {
-            background-color: #2ea043;
-            border-color: #2ea043;
-            opacity: 1;
-        }
-
-        .btn-danger {
-            background-color: #a0302e;
-            border-color: #a0302e;
-            color: #e6edf3;
-            opacity: 0.9;
-        }
-
-        .btn-danger:hover {
-            background-color: #da3633;
-            border-color: #da3633;
-            opacity: 1;
-        }
-
-        .table {
-            color: var(--primary-text);
-            border-color: var(--border-light);
-        }
-
-        .table thead th {
-            background: var(--accent-bg);
-            border-bottom: 2px solid var(--border-light);
-            color: var(--primary-text);
-            padding: 1rem;
-        }
-
-        .table td {
-            border-bottom: 1px solid var(--border-light);
-            padding: 1rem;
-            color: var(--primary-text);
-        }
-
-        .table tbody tr:hover {
-            background: var(--accent-bg);
-        }
-
-        .dataTables_wrapper .dataTables_length, 
-        .dataTables_wrapper .dataTables_filter,
-        .dataTables_wrapper .dataTables_info {
-            color: var(--secondary-text) !important;
-            padding: 1rem;
-            border: 1px solid var(--border-light);
-            border-radius: 8px;
-            margin: 0.5rem 0;
-        }
-
-        .dataTables_wrapper .dataTables_paginate {
-            padding: 1rem;
-            border: 1px solid var(--border-light);
-            border-radius: 8px;
-            margin: 0.5rem 0;
-        }
-
-        .dataTables_wrapper .dataTables_paginate .paginate_button {
-            color: var(--secondary-text) !important;
-            border-radius: 6px;
-            border: 1px solid var(--border-light);
-            margin: 0 2px;
-        }
-
-        .dataTables_wrapper .dataTables_paginate .paginate_button.current {
-            background: var(--accent-color) !important;
-            border-color: var(--accent-color) !important;
-            color: white !important;
-        }
-
-        .alert {
-            border-radius: 10px;
-            border: 1px solid var(--border-light);
-            padding: 1rem 1.5rem;
-        }
-
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--primary-bg);
-            border: 1px solid var(--border-light);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: var(--accent-bg);
-            border-radius: 4px;
-            border: 1px solid var(--border-light);
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--border-color);
-        }
-
-        /* Dropdown styles */
-        .dropdown-menu {
-            background: var(--secondary-bg);
-            border: 1px solid var(--border-light);
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .dropdown-item {
-            color: var(--secondary-text);
-            transition: all 0.2s ease;
-        }
-
-        .dropdown-item:hover {
-            background: var(--accent-bg);
-            color: var(--primary-text);
-        }
-
-        /* List group styles */
-        .list-group-item {
-            background: var(--secondary-bg);
-            border: 1px solid var(--border-light);
-            color: var(--secondary-text);
-        }
-
-        .list-group-item:hover {
-            background: var(--accent-bg);
-            color: var(--primary-text);
-        }
-
-        /* Add styles for MAC addresses and expiry dates */
-        .mac-address {
-            font-family: monospace;
-            font-weight: 500;
-            color: var(--primary-text);
-        }
-
-        .expiry-date {
-            font-weight: 500;
-            color: var(--primary-text);
-        }
-
-        /* Improve modal text contrast */
-        .modal-title {
-            color: var(--primary-text);
-        }
-
-        .text-muted {
-            color: #9ba6b5 !important;
-        }
-
-        /* Ensure card header buttons are dimmed */
-        .card-header.btn {
-            background-color: var(--accent-bg);
-            opacity: 0.85;
-            border: 1px solid var(--border-light);
-        }
-
-        .card-header.btn:hover {
-            background-color: var(--accent-bg);
-            opacity: 1;
-            border-color: var(--border-color);
-        }
-
-        /* Notification badge for navbar */
-        .nav-notification {
-            position: absolute;
-            top: 2px;
-            right: 0;
-            min-width: 16px;
-            height: 16px;
-            padding: 0 4px;
-            font-size: 10px;
-            font-weight: 600;
-            line-height: 16px;
-            text-align: center;
-            color: #ffffff;
-            background: linear-gradient(45deg, #dc3545, #ff4757);
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
-            transform: scale(0.9);
-            transition: transform 0.2s ease;
-        }
-
-        .nav-notification:empty {
-            display: none;
-        }
-
-        /* Position the notification relative to its parent */
-        .nav-item {
-            position: relative;
-            padding-right: 12px;  /* Make room for the badge */
-        }
-
-        /* Hover effect for the badge */
-        .nav-item:hover .nav-notification {
-            transform: scale(1);
-        }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="STB ReStreamer - IPTV portal and streaming management">
+    <title>{% block title %}STB ReStreamer{% endblock %}</title>
+    
+    <!-- Favicons -->
+    <link rel="shortcut icon" type="image/png" href="{{ url_for('static', filename='tv.png') }}" />
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='tv.png') }}">
+    
+    <!-- Fonts and Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/v/bs5/jq-3.6.0/dt-1.11.3/b-2.0.1/datatables.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+    
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/v/bs5/dt-1.11.3/b-2.0.1/datatables.min.js"></script>
+    
+    {% block head %}{% endblock %}
 </head>
 
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light mb-3 mb-lg-3 mt-lg-5 mx-lg-5">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light">
         <div class="container-fluid">
-            <a class="navbar-brand" target="_blank">
-                <img src="../static/tv.png" alt="" width="24" class="d-inline-block align-text-top">
+            <a class="navbar-brand" href="/">
+                <img src="{{ url_for('static', filename='tv.png') }}" alt="STB Logo" width="24" height="24" class="d-inline-block align-text-top">
                 STB ReStreamer
             </a>
+            
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                 data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false"
                 aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
+            
             <div class="collapse navbar-collapse" id="navbarSupportedContent">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     <li class="nav-item">
-                        <a class="nav-link" href="/portals"><i class="fa fa-server"></i> Portals</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/editor"><i class="fa fa-list"></i> Playlist Editor</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/channels"><i class="fa fa-group"></i> Groups</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/settings"><i class="fa fa-sliders"></i> Settings</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/dashboard"><i class="fa fa-dashboard"></i> Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/alerts">
-                            <i class="fa fa-bell"></i> Alerts
-                            <span class="nav-notification" id="unresolved-alerts"></span>
+                        <a class="nav-link {% if request.path == '/portals' %}active{% endif %}" href="/portals">
+                            <i class="bi-server"></i> Portals
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" target="_blank" href="/playlist"><i class="fa fa-file-video-o"></i>
-                            Playlist</a>
+                        <a class="nav-link {% if request.path == '/editor' %}active{% endif %}" href="/editor">
+                            <i class="bi-card-list"></i> Playlist Editor
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" target="_blank" href="/groups_playlist"><i class="fa fa-folder-o"></i>
-                            Groups Playlist</a>
+                        <a class="nav-link {% if request.path == '/channels' %}active{% endif %}" href="/channels">
+                            <i class="bi-collection-fill"></i> Groups
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" target="_blank" href="/xmltv"><i class="fa fa-file-code-o"></i> XMLTV</a>
+                        <a class="nav-link {% if request.path == '/settings' %}active{% endif %}" href="/settings">
+                            <i class="bi-sliders"></i> Settings
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/dashboard' %}active{% endif %}" href="/dashboard">
+                            <i class="bi-speedometer2"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link position-relative {% if request.path == '/alerts' %}active{% endif %}" href="/alerts">
+                            <i class="bi-bell-fill"></i> Alerts
+                            <span id="alert-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                <span class="visually-hidden">unread alerts</span>
+                            </span>
+                        </a>
+                    </li>
+                </ul>
+                
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                    <!-- Direct links instead of dropdown -->
+                    <li class="nav-item">
+                        <a class="nav-link" target="_blank" href="/playlist">
+                            <i class="bi-file-play"></i> Raw Playlist
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" target="_blank" href="/groups_playlist">
+                            <i class="bi-folder"></i> Groups
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" target="_blank" href="/xmltv">
+                            <i class="bi-file-earmark-code"></i> XMLTV
+                        </a>
                     </li>
                 </ul>
             </div>
         </div>
     </nav>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-    {% for category, message in messages %}
-    <div class="alert alert-{{ category }} alert-dismissible auto-dismiss fade show mx-lg-5" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <!-- Flash Messages Container -->
+    <div class="flash-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="app-alert {{ category }} alert-dismissible auto-dismiss fade show" role="alert">
+                    {% if category == 'success' %}
+                        <i class="bi-check-circle-fill"></i>
+                    {% elif category == 'danger' %}
+                        <i class="bi-exclamation-triangle-fill"></i>
+                    {% elif category == 'warning' %}
+                        <i class="bi-exclamation-circle-fill"></i>
+                    {% elif category == 'info' %}
+                        <i class="bi-info-circle-fill"></i>
+                    {% endif %}
+                    <div>{{ message }}</div>
+                    <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endwith %}
     </div>
-    {% endfor %}
-    {% endwith %}
 
-    {% block content %}{% endblock %}
+    <!-- Main Content -->
+    <div class="main-content">
+        {% block content %}{% endblock %}
+    </div>
 
+    <!-- Loading Overlay (hidden by default) -->
+    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <!-- Page-specific JS -->
+    {% block scripts %}{% endblock %}
+
+    <!-- Core JS -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-dismiss flash messages
+            window.setTimeout(function() {
+                const alerts = document.querySelectorAll(".auto-dismiss");
+                alerts.forEach(alert => {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    setTimeout(() => {
+                        bsAlert.close();
+                    }, 500);
+                });
+            }, 4000);
+
+            // Remove focus from buttons after click
+            document.querySelectorAll('.btn, .app-btn').forEach(btn => {
+                btn.addEventListener('mouseup', function() {
+                    this.blur();
+                });
+            });
+
+            // Prevent enter key from submitting forms unintentionally
+            document.querySelectorAll('input:not(textarea)').forEach(input => {
+                input.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                    }
+                });
+            });
+
+            // Update unresolved alerts count
+            function updateUnresolvedAlerts() {
+                fetch('/alerts/unresolved/count')
+                    .then(response => response.json())
+                    .then(data => {
+                        const badge = document.getElementById('alert-badge');
+                        if (data.count > 0) {
+                            badge.textContent = data.count;
+                            badge.style.display = 'inline-flex';
+                        } else {
+                            badge.style.display = 'none';
+                        }
+                    })
+                    .catch(error => console.error('Error fetching alerts count:', error));
+            }
+
+            // Update alerts count on page load and every 30 seconds
+            updateUnresolvedAlerts();
+            setInterval(updateUnresolvedAlerts, 30000);
+            
+            // Initialize Bootstrap dropdowns
+            var dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'));
+            dropdownElementList.forEach(function (dropdownToggleEl) {
+              new bootstrap.Dropdown(dropdownToggleEl);
+            });
+        });
+
+        // Helper function to show/hide loading overlay
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+        
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+    </script>
 </body>
 
 </html>
-
-<script>
-    // remove flash after delay
-    window.setTimeout(function () {
-        $(".auto-dismiss").fadeTo(500, 0).slideUp(500, function () {
-            $(this).remove();
-        });
-    }, 4000);
-
-    // remove sticky focus on buttons
-    $(".btn").mouseup(function () {
-        $(this).blur();
-    })
-
-    // prevent enter submitting forms
-    $(document).on("keydown", ":input:not(textarea)", function (event) {
-        if (event.key == "Enter") {
-            event.preventDefault();
-        }
-    });
-
-    // Update unresolved alerts count
-    function updateUnresolvedAlerts() {
-        fetch('/alerts/unresolved/count')
-            .then(response => response.json())
-            .then(data => {
-                const badge = document.getElementById('unresolved-alerts');
-                if (data.count > 0) {
-                    badge.textContent = data.count;
-                    badge.style.display = 'inline-flex';
-                } else {
-                    badge.style.display = 'none';
-                }
-            })
-            .catch(error => console.error('Error fetching alerts count:', error));
-    }
-
-    // Update alerts count on page load and every 30 seconds
-    updateUnresolvedAlerts();
-    setInterval(updateUnresolvedAlerts, 30000);
-</script>

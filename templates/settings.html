@@ -1,202 +1,230 @@
 {% extends "base.html" %}
+
+{% block title %}Settings - STB ReStreamer{% endblock %}
+
 {% block content %}
-
-<div class="container-fluid text-light p-lg-5">
-
-    <div>
-        <button form="save" class="btn btn-success btn-block" title="Save"><i class="fa fa-save"></i> Save</button>
+<div class="container-fluid p-lg-5">
+    <!-- Page Header -->
+    <div class="page-header">
+        <h2 class="title">Settings</h2>
+        <p class="subtitle">Configure system settings and view system information</p>
+        <div class="divider"></div>
     </div>
-    <br>
-
-    <form id="save" action="/settings/save" method="post"></form>
-
-    <input form="save" type="text" name="hdhr id" id="hdhr id" class="form-control" value="{{ settings['hdhr id'] }}" hidden>
-
-    <h4>Streaming</h4>
-    <hr>
-    <div class="p-sm-3">
-
-        <h6>Streaming Method:</h6>
-        <div class="col-md-2">
-            <select class="form-select" title="Streaming Method" form="save" id="stream method" name="stream method"
-                required>
-                <option {{ "selected" if settings['stream method']=="ffmpeg" }} value="ffmpeg">FFMpeg</option>
-                <option {{ "selected" if settings['stream method']=="redirect" }} value="redirect">Redirect</option>
-            </select>
+    
+    <div class="row">
+        <div class="col-12 mb-4">
+            <form id="settings-form" action="/settings/save" method="post">
+                <div class="app-card primary mb-4">
+                    <div class="card-header">
+                        <h4 class="title"><i class="bi-gear"></i> Stream Settings</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="stream method" class="form-label">Streaming Method</label>
+                                    <select class="form-select" id="stream method" name="stream method" required>
+                                        <option value="ffmpeg" {{ "selected" if settings['stream method'] == "ffmpeg" }}>FFmpeg</option>
+                                        <option value="redirect" {{ "selected" if settings['stream method'] == "redirect" }}>Redirect</option>
+                                    </select>
+                                    <div class="form-text">FFmpeg is required to keep track of accounts and ensure only x users per MAC.</div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="ffmpeg timeout" class="form-label">FFmpeg Timeout (seconds)</label>
+                                    <input type="number" class="form-control" id="ffmpeg timeout" name="ffmpeg timeout" 
+                                           value="{{ settings['ffmpeg timeout'] }}" required placeholder="30">
+                                    <div class="form-text">Seconds to wait for a stream before giving up.</div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="form-group">
+                                    <label for="ffmpeg command" class="form-label">FFmpeg Command</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="ffmpeg command" name="ffmpeg command" 
+                                               value="{{ settings['ffmpeg command'] }}" required placeholder="-hide_banner">
+                                        <button class="app-btn warning" type="button"
+                                                onclick="resetDefault(this)" data-input="ffmpeg command"
+                                                data-default="{{ defaultSettings['ffmpeg command'] }}" title="Reset to default">
+                                            <i class="bi-arrow-counterclockwise"></i>
+                                        </button>
+                                    </div>
+                                    <div class="form-text">
+                                        Edit with caution! Check FFmpeg documentation for help.<br>
+                                        '&lt;proxy&gt;', '&lt;url&gt;', and '&lt;timeout&gt;' are the available variables.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="test streams" name="test streams" 
+                                           value="true" {{ "checked" if settings['test streams'] == 'true' }}>
+                                    <label class="form-check-label" for="test streams">Test Streams</label>
+                                    <div class="form-text">This is required for the fallback system to work.</div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="try all macs" name="try all macs" 
+                                           value="true" {{ "checked" if settings['try all macs'] == 'true' }}>
+                                    <label class="form-check-label" for="try all macs">Try All MAC's</label>
+                                    <div class="form-text">Try all MAC's before looking for a fallback.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="app-card primary mb-4">
+                    <div class="card-header">
+                        <h4 class="title"><i class="bi-list-ul"></i> Playlist Settings</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="use_channel_genres" name="use channel genres" 
+                                           value="true" {{ "checked" if settings['use channel genres'] == 'true' }}>
+                                    <label class="form-check-label" for="use_channel_genres">Use Channel Genres</label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="use_channel_numbers" name="use channel numbers" 
+                                           value="true" {{ "checked" if settings['use channel numbers'] == 'true' }}>
+                                    <label class="form-check-label" for="use_channel_numbers">Use Channel Numbers</label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="sort_playlist_by_channel_genre" name="sort playlist by channel genre" 
+                                           value="true" {{ "checked" if settings['sort playlist by channel genre'] == 'true' }}>
+                                    <label class="form-check-label" for="sort_playlist_by_channel_genre">Sort by Genre</label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="sort_playlist_by_channel_number" name="sort playlist by channel number" 
+                                           value="true" {{ "checked" if settings['sort playlist by channel number'] == 'true' }}>
+                                    <label class="form-check-label" for="sort_playlist_by_channel_number">Sort by Number</label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="sort_playlist_by_channel_name" name="sort playlist by channel name" 
+                                           value="true" {{ "checked" if settings['sort playlist by channel name'] == 'true' }}>
+                                    <label class="form-check-label" for="sort_playlist_by_channel_name">Sort by Name</label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="app-alert info">
+                                    <i class="bi-info-circle-fill"></i>
+                                    <div>
+                                        Sorting options stack and are applied: Genre > Number > Name.<br>
+                                        Without any sorting, the channels are listed as the server lists them.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="app-card primary mb-4">
+                    <div class="card-header">
+                        <h4 class="title"><i class="bi-shield-lock"></i> Security Settings</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="enable_security" name="enable security" 
+                                           value="true" {{ "checked" if settings['enable security'] == 'true' }}>
+                                    <label class="form-check-label" for="enable_security">Enable Security</label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="username" class="form-label">Username</label>
+                                    <input type="text" class="form-control" id="username" name="username" 
+                                           value="{{ settings['username'] }}" required placeholder="admin">
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="password" class="form-label">Password</label>
+                                    <input type="password" class="form-control" id="password" name="password" 
+                                           value="{{ settings['password'] }}" required placeholder="password">
+                                    <div class="form-text">Recommended if STB-Proxy is exposed to the internet or on a public network.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="app-card primary mb-4">
+                    <div class="card-header">
+                        <h4 class="title"><i class="bi-tv"></i> HDHomeRun Settings</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <input type="text" name="hdhr id" id="hdhr id" value="{{ settings['hdhr id'] }}" hidden>
+                            
+                            <div class="col-12">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="enable_hdhr" name="enable hdhr" 
+                                           value="true" {{ "checked" if settings['enable hdhr'] == 'true' }}>
+                                    <label class="form-check-label" for="enable_hdhr">Enable HDHomeRun</label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="hdhr_name" class="form-label">HDHomeRun Name</label>
+                                    <input type="text" class="form-control" id="hdhr_name" name="hdhr name" 
+                                           value="{{ settings['hdhr name'] }}" placeholder="My HDHomeRun">
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="hdhr_tuners" class="form-label">Number of Tuners</label>
+                                    <input type="number" class="form-control" id="hdhr_tuners" name="hdhr tuners" 
+                                           value="{{ settings['hdhr tuners'] }}" min="1" max="100" placeholder="3">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-end mt-4">
+                    <button type="submit" class="app-btn primary">
+                        <i class="bi-save"></i> Save Settings
+                    </button>
+                </div>
+            </form>
         </div>
-        <span class="text-muted">FFMpeg is required to keep track of accounts and ensure only x users per MAC.</span>
-
-        <br><br>
-
-        <h6>FFMpeg Command:</h6>
-        <div class="col-md-12">
-            <div class="input-group flex-nowrap">
-                <input form="save" type="text" name="ffmpeg command" id="ffmpeg command" class="form-control"
-                    value="{{ settings['ffmpeg command'] }}" required>
-                <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
-                        onclick="resetDefault(this)" data-input="ffmpeg command"
-                        data-default="{{ defaultSettings['ffmpeg command'] }}"></i></button>
-            </div>
-        </div>
-        <span class="text-muted">Edit with caution! Check FFmpeg documentation for help.<br>'&lt;proxy&gt;',
-            '&lt;url&gt;', and '&lt;timeout&gt;' are the available variables.</span>
-
-        <br><br>
-
-        <h6>FFMpeg Timeout:</h6>
-        <div class="col-md-2">
-            <div class="input-group flex-nowrap">
-                <input form="save" type="number" name="ffmpeg timeout" id="ffmpeg timeout" class="form-control"
-                    value="{{ settings['ffmpeg timeout'] }}" required>
-                <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
-                        onclick="resetDefault(this)" data-input="ffmpeg timeout" data-default="{{ defaultSettings['ffmpeg timeout'] }}"></i></button>
-            </div>
-        </div>
-        <span class="text-muted">Seconds to wait for a stream before giving up.</span>
-
-        <br><br>
-
-        <h6>Test Streams:</h6>
-        <div class="col-md-2">
-            <div class="form-check form-switch">
-                <input form="save" type="checkbox" class="checkbox form-check-input" name="test streams" value="true" {{ "checked" if settings['test streams']=='true' }}>
-            </div>
-        </div>
-        <span class="text-muted">This is required for the fallback system to work.</span>
-
-        <br><br>
-
-        <h6>Try All MAC's:</h6>
-        <div class="col-md-2">
-            <div class="form-check form-switch">
-                <input form="save" type="checkbox" class="checkbox form-check-input" name="try all macs" value="true" {{ "checked" if settings['try all macs']=='true' }}>
-            </div>
-        </div>
-        <span class="text-muted">Try all MAC's before looking for a fallback.</span>
-
     </div>
-
-    <br>
-
-    <h4>Playlist</h4>
-    <hr>
-    <div class="p-sm-3">
-
-        <h6>Use channel genres:</h6>
-        <div class="form-check form-switch">
-            <input form="save" type="checkbox" class="checkbox form-check-input" name="use channel genres" value="true" {{ "checked" if settings['use channel genres']=='true' }}>
-        </div>
-
-        <br>
-
-        <h6>Use channel numbers:</h6>
-        <div class="form-check form-switch">
-            <input form="save" type="checkbox" class="checkbox form-check-input" name="use channel numbers" value="true" {{ "checked" if settings['use channel numbers']=='true' }}>
-        </div>
-
-        <br>
-
-        <h6>Sort by genre:</h6>
-        <div class="form-check form-switch">
-            <input form="save" type="checkbox" class="checkbox form-check-input" name="sort playlist by channel genre" value="true" {{ "checked" if settings['sort playlist by channel genre']=='true' }}>
-        </div>
-
-        <br>
-
-        <h6>Sort by number:</h6>
-        <div class="form-check form-switch">
-            <input form="save" type="checkbox" class="checkbox form-check-input" name="sort playlist by channel number" value="true" {{ "checked" if settings['sort playlist by channel number']=='true' }}>
-        </div>
-
-        <br>
-
-        <h6>Sort by name:</h6>
-        <div class="form-check form-switch">
-            <input form="save" type="checkbox" class="checkbox form-check-input" name="sort playlist by channel name" value="true" {{ "checked" if settings['sort playlist by channel name']=='true' }}>
-        </div>
-        <span class="text-muted">Sorting options stack and are applied: Genre > Number > Name.<br>Without any sorting
-            the channels are listed as the server lists them.</span>
-
-    </div>
-
-    <br>
-
-    <h4>Security</h4>
-    <hr>
-    <div class="p-sm-3">
-
-        <h6>Enable:</h6>
-        <div class="form-check form-switch">
-            <input form="save" type="checkbox" class="checkbox form-check-input" name="enable security" value="true" {{ "checked" if settings['enable security']=='true' }}>
-        </div>
-
-        <br>
-
-        <h6>Username:</h6>
-        <div class="col-md-4">
-            <input form="save" type="text" name="username" id="username" class="form-control"
-                value="{{ settings['username'] }}" title="Username" required>
-        </div>
-
-        <br>
-
-        <h6>Password:</h6>
-        <div class="col-md-4">
-            <input form="save" type="password" name="password" id="password" class="form-control"
-                value="{{ settings['password'] }}" title="Password" required>
-        </div>
-        <span class="text-muted">Recommended if STB-Proxy is exposed to the internet or on a public network.</span>
-
-    </div>
-
-    <br>
-
-    <h4>HDHomeRun</h4>
-    <hr>
-    <div class="p-sm-3">
-
-        <h6>Enable:</h6>
-        <div class="form-check form-switch">
-            <input form="save" type="checkbox" class="checkbox form-check-input" name="enable hdhr" value="true" {{ "checked" if settings['enable hdhr']=='true' }}>
-        </div>
-
-        <br>
-
-        <h6>Name:</h6>
-        <div class="col-md-4">
-            <div class="input-group flex-nowrap">
-                <input form="save" type="text" name="hdhr name" id="hdhr name" class="form-control"
-                    value="{{ settings['hdhr name'] }}" required>
-                <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
-                        onclick="resetDefault(this)" data-input="hdhr name" data-default="{{ defaultSettings['hdhr name'] }}"></i></button>
-            </div>
-        </div>
-        <span class="text-muted">Display name of the server in Plex DVR etc.</span>
-
-        <br>
-        <br>
-
-        <h6>Tuners:</h6>
-        <div class="col-md-2">
-            <div class="input-group flex-nowrap">
-                <input form="save" type="number" name="hdhr tuners" id="hdhr tuners" class="form-control"
-                    value="{{ settings['hdhr tuners'] }}" required>
-                <button class="btn btn-danger btn-block" title="Reset"><i class="fa fa-undo"
-                        onclick="resetDefault(this)" data-input="hdhr tuners" data-default="{{ defaultSettings['hdhr tuners'] }}"></i></button>
-            </div>
-        </div>
-        <span class="text-muted">Max concurrent streams in Plex DVR etc.</span>
-
-    </div>
-
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
-    function resetDefault(ele) {
-        var d = ele.getAttribute('data-default');
-        var i = ele.getAttribute('data-input');
-        document.getElementById(i).value = d;
+    function resetDefault(btn) {
+        const inputId = btn.getAttribute('data-input');
+        const defaultValue = btn.getAttribute('data-default');
+        document.getElementById(inputId).value = defaultValue;
     }
 </script>
-
 {% endblock %}
