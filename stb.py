@@ -293,3 +293,95 @@ def getEpg(url, mac, token, period, proxy=None):
     except:
         pass
 
+
+def getVodCategories(url, mac, token, proxy=None):
+    """
+    Fetches VOD categories from the portal API.
+    
+    Args:
+        url (str): Portal URL
+        mac (str): MAC address
+        token (str): Authentication token
+        proxy (str, optional): Proxy URL. Defaults to None.
+        
+    Returns:
+        list: List of VOD category dictionaries or None if failed
+    """
+    proxies = {"http": proxy, "https": proxy}
+    cookies = {"mac": mac, "stb_lang": "en", "timezone": "Europe/Paris"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3",
+        "Authorization": "Bearer " + token,
+        "X-User-Agent": "Model: MAG250; Link: WiFi",
+    }
+    try:
+        response = s.get(
+            url + "?type=vod&action=get_categories&JsHttpRequest=1-xml",
+            cookies=cookies,
+            headers=headers,
+            proxies=proxies,
+        )
+        categories = response.json()["js"]
+        if categories:
+            return categories
+    except:
+        pass
+    return None
+
+
+def getSeriesCategories(url, mac, token, proxy=None):
+    """
+    Fetches Series categories from the portal API.
+    
+    Args:
+        url (str): Portal URL
+        mac (str): MAC address
+        token (str): Authentication token
+        proxy (str, optional): Proxy URL. Defaults to None.
+        
+    Returns:
+        list: List of Series category dictionaries or None if failed
+    """
+    proxies = {"http": proxy, "https": proxy}
+    cookies = {"mac": mac, "stb_lang": "en", "timezone": "Europe/Paris"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3",
+        "Authorization": "Bearer " + token,
+        "X-User-Agent": "Model: MAG250; Link: WiFi",
+    }
+    try:
+        # First try with series type
+        response = s.get(
+            url + "?type=series&action=get_categories&JsHttpRequest=1-xml",
+            cookies=cookies,
+            headers=headers,
+            proxies=proxies,
+        )
+        categories = response.json()["js"]
+        if categories:
+            # Add type field to identify as Series categories
+            for category in categories:
+                if isinstance(category, dict):
+                    category["type"] = "Series"
+            return categories
+            
+        # If no series categories found, try VOD categories and filter for Series type
+        response = s.get(
+            url + "?type=vod&action=get_categories&JsHttpRequest=1-xml",
+            cookies=cookies,
+            headers=headers,
+            proxies=proxies,
+        )
+        categories = response.json()["js"]
+        if categories:
+            # Filter and mark Series categories
+            series_categories = []
+            for category in categories:
+                if isinstance(category, dict) and category.get("category_type") == "Series":
+                    category["type"] = "Series"
+                    series_categories.append(category)
+            return series_categories if series_categories else None
+    except:
+        pass
+    return None
+
