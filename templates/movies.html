@@ -1,0 +1,750 @@
+{% extends "base.html" %}
+
+{% block title %}Movies{% endblock %}
+
+{% block head %}
+<!-- Add jQuery UI for autocomplete functionality -->
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/dark-hive/jquery-ui.css">
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+<script>
+    // Fallback to load jQuery UI if it's not already loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof $.ui === 'undefined') {
+            console.log('jQuery UI not detected, loading fallback...');
+            var script = document.createElement('script');
+            script.src = 'https://code.jquery.com/ui/1.13.2/jquery-ui.min.js';
+            script.onload = function() {
+                console.log('jQuery UI loaded successfully');
+                // Re-initialize autocomplete if needed
+                if (typeof initializeAutocomplete === 'function') {
+                    setTimeout(initializeAutocomplete, 500);
+                }
+            };
+            document.head.appendChild(script);
+        }
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-lg-5">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">Movies</h1>
+
+            <!-- Advanced Search Panel -->
+            <div class="app-card primary mb-4">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label text-light">Movie Title</label>
+                            <input type="text" class="form-control" id="titleSearch" placeholder="Search title...">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-light">Category</label>
+                            <select class="form-select" id="categorySelect">
+                                <option value="">All Categories</option>
+                                <!-- Categories will be dynamically loaded -->
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-light">Portal</label>
+                            <select id="portalSelect" class="form-select">
+                                <option value="">Select a portal</option>
+                                {% for id, portal in portals.items() %}
+                                    {% if portal.enabled == "true" %}
+                                        <option value="{{ id }}">{{ portal.name }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <div class="d-flex align-items-center">
+                                <button class="btn btn-primary me-2" onclick="applyFilters()">
+                                    <i class="bi-search"></i> Apply Filters
+                                </button>
+                                <button class="btn btn-secondary me-4" onclick="resetFilters()">
+                                    <i class="bi-arrow-counterclockwise"></i> Reset Filters
+                                </button>
+                                <label class="form-label text-light me-2 mb-0 ms-4">Show</label>
+                                <select class="form-select d-inline-block w-auto" id="moviesPerPage">
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                    <option value="250">250</option>
+                                    <option value="500">500</option>
+                                    <option value="1000">1000</option>
+                                    <option value="-1">All</option>
+                                </select>
+                                <label class="form-label text-light ms-2 mb-0">movies</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Table -->
+            <div class="table-responsive">
+                <table id="moviesTable" class="table table-striped table-dark nowrap" width="100%">
+                    <thead>
+                        <tr>
+                            <th>
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="checkbox form-check-input" id="selectAll" onchange="selectAllMovies(this)">
+                                </div>
+                            </th>
+                            <th>Play</th>
+                            <th>View</th>
+                            <th>Title</th>
+                            <th>Year</th>
+                            <th>Category</th>
+                            <th>Genre</th>
+                            <th>Portal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Movies will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Playlist Controls -->
+            <div class="app-card primary mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Playlist Management</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="playlistName" class="form-label text-light">Playlist Name</label>
+                                <input type="text" class="form-control" id="playlistName" placeholder="My Movies Playlist">
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="includeMetadataSwitch" checked>
+                                    <label class="form-check-label text-light" for="includeMetadataSwitch">Include Metadata</label>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="xuiCompatibleSwitch">
+                                    <label class="form-check-label text-light" for="xuiCompatibleSwitch">XUI One Panel Compatible Format</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-grid gap-2 mb-3">
+                                <button class="btn btn-primary" id="createPlaylistBtn">
+                                    <i class="bi-file-earmark-music"></i> Create M3U Playlist
+                                </button>
+                                <button class="btn btn-outline-primary" id="createRawPlaylistBtn">
+                                    <i class="bi-code"></i> Create Raw Playlist
+                                </button>
+                            </div>
+                            <div id="selectedCount" class="mt-2 text-center text-light">
+                                0 movies selected
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Raw Playlist Modal -->
+<div class="modal fade" id="rawPlaylistModal" tabindex="-1" aria-labelledby="rawPlaylistModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header">
+                <h5 class="modal-title" id="rawPlaylistModalLabel">Raw Playlist</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="rawPlaylistContent" class="form-label">Playlist Content</label>
+                    <textarea class="form-control bg-dark text-light" id="rawPlaylistContent" rows="15" readonly></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="copyRawPlaylistBtn">
+                    <i class="bi-clipboard"></i> Copy to Clipboard
+                </button>
+                <button type="button" class="btn btn-success" id="downloadRawPlaylistBtn">
+                    <i class="bi-download"></i> Download
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Movie Details Modal -->
+<div class="modal fade" id="movieModal" tabindex="-1" aria-labelledby="movieModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="movieModalLabel">Movie Title</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <img id="moviePoster" src="" alt="Movie Poster" class="img-fluid rounded">
+                    </div>
+                    <div class="col-md-8">
+                        <div id="movieDetails">
+                            <!-- Movie details will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a id="watchMovieBtn" href="#" class="btn btn-primary">Watch Movie</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const portalSelect = document.getElementById('portalSelect');
+        const titleSearch = document.getElementById('titleSearch');
+        const categorySelect = document.getElementById('categorySelect');
+        const moviesTable = document.getElementById('moviesTable').querySelector('tbody');
+        const movieModal = new bootstrap.Modal(document.getElementById('movieModal'));
+        const rawPlaylistModal = new bootstrap.Modal(document.getElementById('rawPlaylistModal'));
+        const createPlaylistBtn = document.getElementById('createPlaylistBtn');
+        const createRawPlaylistBtn = document.getElementById('createRawPlaylistBtn');
+        const selectedCount = document.getElementById('selectedCount');
+
+        let currentPortal = '';
+        let allMovies = [];
+        let allCategories = [];
+        let selectedMovies = new Set();
+
+        // Handle portal selection
+        portalSelect.addEventListener('change', function() {
+            currentPortal = this.value;
+            if (currentPortal) {
+                loadCategories(currentPortal);
+            } else {
+                categorySelect.innerHTML = '<option value="">All Categories</option>';
+                moviesTable.innerHTML = '<tr><td colspan="8" class="text-center">Select a portal first</td></tr>';
+                updateSelectedCount();
+            }
+        });
+
+        // Handle filter application
+        function applyFilters() {
+            const title = titleSearch.value.toLowerCase();
+            const category = categorySelect.value;
+            
+            if (!currentPortal) {
+                moviesTable.innerHTML = '<tr><td colspan="8" class="text-center">Select a portal first</td></tr>';
+                return;
+            }
+            
+            if (allMovies.length === 0) {
+                loadAllMovies(currentPortal);
+                return;
+            }
+            
+            displayFilteredMovies(title, category);
+        }
+        
+        window.applyFilters = applyFilters;
+        
+        function resetFilters() {
+            titleSearch.value = '';
+            categorySelect.value = '';
+            
+            if (currentPortal && allMovies.length > 0) {
+                displayFilteredMovies('', '');
+            }
+        }
+        
+        window.resetFilters = resetFilters;
+
+        // Load categories for a portal
+        function loadCategories(portalId) {
+            categorySelect.innerHTML = '<option value="">Loading categories...</option>';
+            categorySelect.disabled = true;
+            
+            // Get portal name for cache files
+            const portalName = document.querySelector(`#portalSelect option[value="${portalId}"]`).textContent;
+            
+            // Fetch directly from API instead of using cache
+            fetch(`/api/portal/${portalId}/vod/categories`)
+                .then(response => response.json())
+                .then(categories => {
+                    allCategories = categories;
+                    categorySelect.innerHTML = '<option value="">All Categories</option>';
+                    
+                    categories.forEach(category => {
+                        const option = document.createElement('option');
+                        option.value = category.id;
+                        option.textContent = category.title;
+                        categorySelect.appendChild(option);
+                    });
+                    
+                    categorySelect.disabled = false;
+                    loadAllMovies(portalId);
+                })
+                .catch(error => {
+                    console.error('Error loading categories:', error);
+                    categorySelect.innerHTML = '<option value="">Error loading categories</option>';
+                    categorySelect.disabled = false;
+                    moviesTable.innerHTML = `<tr><td colspan="8" class="text-center">
+                        <div class="alert alert-danger">
+                            Error loading categories: ${error.message || 'Unknown error'}
+                        </div>
+                    </td></tr>`;
+                });
+        }
+
+        // Load all movies from all categories
+        function loadAllMovies(portalId) {
+            allMovies = [];
+            selectedMovies.clear();
+            updateSelectedCount();
+            
+            moviesTable.innerHTML = `<tr><td colspan="8" class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading movies...</span>
+                </div>
+                <p class="mt-2">Loading movies from all categories...</p>
+            </td></tr>`;
+            
+            if (!allCategories || allCategories.length === 0) {
+                moviesTable.innerHTML = '<tr><td colspan="8" class="text-center">No categories found</td></tr>';
+                return;
+            }
+            
+            // Skip loading all movies from cache and go directly to category-by-category loading
+            // Track loading progress
+            let categoriesLoaded = 0;
+            const totalCategories = allCategories.length;
+            
+            // Load movies from each category with delay between requests
+            const loadCategoryWithDelay = (index) => {
+                if (index >= allCategories.length) {
+                    return; // All categories processed
+                }
+                
+                const category = allCategories[index];
+                
+                // Update loading status
+                moviesTable.innerHTML = `<tr><td colspan="8" class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading movies...</span>
+                    </div>
+                    <p class="mt-2">Loading movies from categories... (${categoriesLoaded}/${totalCategories})</p>
+                </td></tr>`;
+                
+                // Fetch directly from API instead of trying cache first
+                fetch(`/api/portal/${portalId}/vod/category/${category.id}/items`)
+                    .then(response => response.json())
+                    .then(data => {
+                        // Add category info to each movie
+                        data.forEach(movie => {
+                            movie.categoryId = category.id;
+                            movie.categoryTitle = category.title;
+                        });
+                        
+                        // Add to all movies array
+                        allMovies = allMovies.concat(data);
+                        
+                        // Update progress
+                        categoriesLoaded++;
+                        
+                        if (categoriesLoaded === totalCategories) {
+                            // All categories loaded, display movies
+                            displayFilteredMovies('', '');
+                        } else {
+                            // Load next category after a delay
+                            setTimeout(() => {
+                                loadCategoryWithDelay(index + 1);
+                            }, 500); // 500ms delay between category requests
+                        }
+                    })
+                    .catch(error => {
+                        console.error(`Error loading movies for category ${category.title}:`, error);
+                        categoriesLoaded++;
+                        
+                        if (categoriesLoaded === totalCategories) {
+                            // All categories loaded, display movies even with errors
+                            displayFilteredMovies('', '');
+                        } else {
+                            // Continue to next category after a delay
+                            setTimeout(() => {
+                                loadCategoryWithDelay(index + 1);
+                            }, 500); // 500ms delay between category requests
+                        }
+                    });
+            };
+            
+            // Start loading categories with delay
+            loadCategoryWithDelay(0);
+        }
+
+        // Display filtered movies
+        function displayFilteredMovies(titleFilter, categoryFilter) {
+            if (allMovies.length === 0) {
+                moviesTable.innerHTML = '<tr><td colspan="8" class="text-center">No movies found</td></tr>';
+                return;
+            }
+            
+            // Apply filters
+            const filteredMovies = allMovies.filter(movie => {
+                const matchesTitle = !titleFilter || 
+                    (movie.name && movie.name.toLowerCase().includes(titleFilter)) || 
+                    (movie.o_name && movie.o_name.toLowerCase().includes(titleFilter));
+                
+                const matchesCategory = !categoryFilter || movie.categoryId === categoryFilter;
+                
+                return matchesTitle && matchesCategory;
+            });
+            
+            if (filteredMovies.length === 0) {
+                moviesTable.innerHTML = '<tr><td colspan="8" class="text-center">No movies match the filters</td></tr>';
+                return;
+            }
+            
+            // Clear table
+            moviesTable.innerHTML = '';
+            
+            // Add movies to table
+            filteredMovies.forEach(movie => {
+                const row = document.createElement('tr');
+                
+                // Checkbox column
+                const checkboxCell = document.createElement('td');
+                const checkboxDiv = document.createElement('div');
+                checkboxDiv.className = 'form-check form-switch';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'movie-checkbox form-check-input';
+                checkbox.dataset.movieId = movie.id;
+                checkbox.checked = selectedMovies.has(movie.id);
+                checkbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        selectedMovies.add(movie.id);
+                    } else {
+                        selectedMovies.delete(movie.id);
+                    }
+                    updateSelectedCount();
+                });
+                checkboxDiv.appendChild(checkbox);
+                checkboxCell.appendChild(checkboxDiv);
+                row.appendChild(checkboxCell);
+                
+                // Play button column
+                const playCell = document.createElement('td');
+                const playButton = document.createElement('button');
+                playButton.className = 'btn btn-sm btn-outline-primary';
+                playButton.innerHTML = '<i class="bi-play-fill"></i>';
+                playButton.title = 'Play movie';
+                playButton.addEventListener('click', function() {
+                    window.open(`/play/vod/${currentPortal}/${movie.id}?web=true`, '_blank');
+                });
+                playCell.appendChild(playButton);
+                row.appendChild(playCell);
+                
+                // View button column
+                const viewCell = document.createElement('td');
+                const viewButton = document.createElement('button');
+                viewButton.className = 'btn btn-sm btn-outline-info';
+                viewButton.innerHTML = '<i class="bi-info-circle"></i>';
+                viewButton.title = 'View movie details';
+                viewButton.addEventListener('click', function() {
+                    showMovieDetails(movie);
+                });
+                viewCell.appendChild(viewButton);
+                row.appendChild(viewCell);
+                
+                // Title column
+                const titleCell = document.createElement('td');
+                titleCell.textContent = movie.name || movie.o_name || 'Unknown';
+                row.appendChild(titleCell);
+                
+                // Year column
+                const yearCell = document.createElement('td');
+                yearCell.textContent = movie.year || 'N/A';
+                row.appendChild(yearCell);
+                
+                // Category column
+                const categoryCell = document.createElement('td');
+                categoryCell.textContent = movie.categoryTitle || 'Unknown';
+                row.appendChild(categoryCell);
+                
+                // Genre column
+                const genreCell = document.createElement('td');
+                genreCell.textContent = movie.genre || 'N/A';
+                row.appendChild(genreCell);
+                
+                // Portal column
+                const portalCell = document.createElement('td');
+                const portalName = document.querySelector(`#portalSelect option[value="${currentPortal}"]`).textContent;
+                portalCell.textContent = portalName;
+                row.appendChild(portalCell);
+                
+                moviesTable.appendChild(row);
+            });
+        }
+
+        // Show movie details
+        function showMovieDetails(movie) {
+            document.getElementById('movieModalLabel').textContent = movie.name || movie.o_name || 'Movie Details';
+            
+            // Set poster
+            const poster = document.getElementById('moviePoster');
+            if (movie.screenshot_uri || movie.poster_path || movie.cover_big) {
+                poster.src = movie.screenshot_uri || movie.poster_path || movie.cover_big;
+                poster.style.display = 'block';
+            } else {
+                poster.style.display = 'none';
+            }
+            
+            // Set details
+            const detailsDiv = document.getElementById('movieDetails');
+            let detailsHTML = '<dl class="row">';
+            
+            if (movie.o_name && movie.o_name !== movie.name) {
+                detailsHTML += `<dt class="col-sm-4">Original Title</dt><dd class="col-sm-8">${movie.o_name}</dd>`;
+            }
+            
+            if (movie.year) {
+                detailsHTML += `<dt class="col-sm-4">Year</dt><dd class="col-sm-8">${movie.year}</dd>`;
+            }
+            
+            if (movie.genre) {
+                detailsHTML += `<dt class="col-sm-4">Genre</dt><dd class="col-sm-8">${movie.genre}</dd>`;
+            }
+            
+            if (movie.director) {
+                detailsHTML += `<dt class="col-sm-4">Director</dt><dd class="col-sm-8">${movie.director}</dd>`;
+            }
+            
+            if (movie.actors) {
+                detailsHTML += `<dt class="col-sm-4">Cast</dt><dd class="col-sm-8">${movie.actors}</dd>`;
+            }
+            
+            if (movie.description || movie.plot) {
+                detailsHTML += `<dt class="col-sm-4">Description</dt><dd class="col-sm-8">${movie.description || movie.plot}</dd>`;
+            }
+            
+            if (movie.rating) {
+                detailsHTML += `<dt class="col-sm-4">Rating</dt><dd class="col-sm-8">${movie.rating}</dd>`;
+            }
+            
+            if (movie.duration) {
+                detailsHTML += `<dt class="col-sm-4">Duration</dt><dd class="col-sm-8">${movie.duration} min</dd>`;
+            }
+            
+            detailsHTML += '</dl>';
+            detailsDiv.innerHTML = detailsHTML;
+            
+            // Set watch button
+            const watchBtn = document.getElementById('watchMovieBtn');
+            watchBtn.href = `/play/vod/${currentPortal}/${movie.id}?web=true`;
+            
+            // Show modal
+            movieModal.show();
+        }
+
+        // Select all movies
+        function selectAllMovies(checkbox) {
+            const checked = checkbox.checked;
+            document.querySelectorAll('.movie-checkbox').forEach(cb => {
+                cb.checked = checked;
+                const movieId = cb.dataset.movieId;
+                if (checked) {
+                    selectedMovies.add(movieId);
+                } else {
+                    selectedMovies.delete(movieId);
+                }
+            });
+            updateSelectedCount();
+        }
+        window.selectAllMovies = selectAllMovies;
+
+        // Update selected count
+        function updateSelectedCount() {
+            selectedCount.textContent = `${selectedMovies.size} movies selected`;
+        }
+
+        // Create playlist
+        createPlaylistBtn.addEventListener('click', function() {
+            if (selectedMovies.size === 0) {
+                alert('Please select at least one movie');
+                return;
+            }
+            
+            const playlistName = document.getElementById('playlistName').value || 'My Movies Playlist';
+            const includeMetadata = document.getElementById('includeMetadataSwitch').checked;
+            const xuiCompatible = document.getElementById('xuiCompatibleSwitch').checked;
+            
+            // Show loading indicator
+            const originalButtonText = this.innerHTML;
+            this.innerHTML = '<i class="bi-hourglass-split"></i> Creating Playlist...';
+            this.disabled = true;
+            
+            const formData = {
+                portalId: currentPortal,
+                movieIds: Array.from(selectedMovies),
+                playlistName: playlistName,
+                includeMetadata: includeMetadata,
+                xuiCompatible: xuiCompatible
+            };
+            
+            // Add a simple console log to verify the data being sent
+            console.log('Sending request to /api/playlist/movies with data:', formData);
+            
+            fetch('/api/playlist/movies', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => {
+                console.log('Response status:', response.status, response.statusText);
+                
+                // Reset button state
+                this.innerHTML = originalButtonText;
+                this.disabled = false;
+                
+                if (!response.ok) {
+                    // Try to parse the error message from the response
+                    return response.text().then(text => {
+                        try {
+                            // Try to parse as JSON
+                            const errorData = JSON.parse(text);
+                            throw new Error(errorData.error || 'Network response was not ok');
+                        } catch (e) {
+                            // If not valid JSON, just use the text
+                            throw new Error('Server error: ' + (text || response.statusText));
+                        }
+                    });
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `${playlistName.replace(/\s+/g, '_')}.m3u`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(error => {
+                // Reset button state if not already done
+                this.innerHTML = originalButtonText;
+                this.disabled = false;
+                
+                console.error('Error creating playlist:', error);
+                alert('Error creating playlist: ' + error.message);
+            });
+        });
+
+        // Create raw playlist
+        createRawPlaylistBtn.addEventListener('click', function() {
+            if (selectedMovies.size === 0) {
+                alert('Please select at least one movie');
+                return;
+            }
+            
+            const playlistName = document.getElementById('playlistName').value || 'My Movies Playlist';
+            const includeMetadata = document.getElementById('includeMetadataSwitch').checked;
+            const xuiCompatible = document.getElementById('xuiCompatibleSwitch').checked;
+            
+            // Show loading indicator
+            const originalButtonText = this.innerHTML;
+            this.innerHTML = '<i class="bi-hourglass-split"></i> Creating Playlist...';
+            this.disabled = true;
+            
+            const formData = {
+                portalId: currentPortal,
+                movieIds: Array.from(selectedMovies),
+                playlistName: playlistName,
+                includeMetadata: includeMetadata,
+                xuiCompatible: xuiCompatible
+            };
+            
+            // Add a simple console log to verify the data being sent
+            console.log('Sending request to /api/playlist/movies with data:', formData);
+            
+            fetch('/api/playlist/movies', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => {
+                console.log('Response status:', response.status, response.statusText);
+                
+                // Reset button state
+                this.innerHTML = originalButtonText;
+                this.disabled = false;
+                
+                if (!response.ok) {
+                    // Try to parse the error message from the response
+                    return response.text().then(text => {
+                        try {
+                            // Try to parse as JSON
+                            const errorData = JSON.parse(text);
+                            throw new Error(errorData.error || 'Network response was not ok');
+                        } catch (e) {
+                            // If not valid JSON, just use the text
+                            throw new Error('Server error: ' + (text || response.statusText));
+                        }
+                    });
+                }
+                return response.text();
+            })
+            .then(text => {
+                document.getElementById('rawPlaylistContent').value = text;
+                rawPlaylistModal.show();
+            })
+            .catch(error => {
+                // Reset button state if not already done
+                this.innerHTML = originalButtonText;
+                this.disabled = false;
+                
+                console.error('Error creating raw playlist:', error);
+                alert('Error creating raw playlist: ' + error.message);
+            });
+        });
+
+        // Copy to clipboard button
+        document.getElementById('copyRawPlaylistBtn').addEventListener('click', function() {
+            const textarea = document.getElementById('rawPlaylistContent');
+            textarea.select();
+            document.execCommand('copy');
+            alert('Playlist copied to clipboard');
+        });
+
+        // Download raw playlist button
+        document.getElementById('downloadRawPlaylistBtn').addEventListener('click', function() {
+            const content = document.getElementById('rawPlaylistContent').value;
+            const playlistName = document.getElementById('playlistName').value || 'My_Movies_Playlist';
+            const blob = new Blob([content], {type: 'audio/x-mpegurl'});
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `${playlistName.replace(/\s+/g, '_')}.m3u`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+        });
+    });
+</script>
+{% endblock %}

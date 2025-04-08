@@ -1,0 +1,1035 @@
+{% extends "base.html" %}
+
+{% block title %}TV Series{% endblock %}
+
+{% block head %}
+<!-- Add jQuery UI for autocomplete functionality -->
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/dark-hive/jquery-ui.css">
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+<script>
+    // Fallback to load jQuery UI if it's not already loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof $.ui === 'undefined') {
+            console.log('jQuery UI not detected, loading fallback...');
+            var script = document.createElement('script');
+            script.src = 'https://code.jquery.com/ui/1.13.2/jquery-ui.min.js';
+            script.onload = function() {
+                console.log('jQuery UI loaded successfully');
+                // Re-initialize autocomplete if needed
+                if (typeof initializeAutocomplete === 'function') {
+                    setTimeout(initializeAutocomplete, 500);
+                }
+            };
+            document.head.appendChild(script);
+        }
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-lg-5">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">TV Series</h1>
+
+            <!-- Advanced Search Panel -->
+            <div class="app-card primary mb-4">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label text-light">Series Title</label>
+                            <input type="text" class="form-control" id="titleSearch" placeholder="Search title...">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-light">Category</label>
+                            <select class="form-select" id="categorySelect">
+                                <option value="">All Categories</option>
+                                <!-- Categories will be dynamically loaded -->
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-light">Portal</label>
+                            <select id="portalSelect" class="form-select">
+                                <option value="">Select a portal</option>
+                                {% for id, portal in portals.items() %}
+                                    {% if portal.enabled == "true" %}
+                                        <option value="{{ id }}">{{ portal.name }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <div class="d-flex align-items-center">
+                                <button class="btn btn-primary me-2" onclick="applyFilters()">
+                                    <i class="bi-search"></i> Apply Filters
+                                </button>
+                                <button class="btn btn-secondary me-4" onclick="resetFilters()">
+                                    <i class="bi-arrow-counterclockwise"></i> Reset Filters
+                                </button>
+                                <label class="form-label text-light me-2 mb-0 ms-4">Show</label>
+                                <select class="form-select d-inline-block w-auto" id="seriesPerPage">
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                    <option value="250">250</option>
+                                    <option value="500">500</option>
+                                    <option value="1000">1000</option>
+                                    <option value="-1">All</option>
+                                </select>
+                                <label class="form-label text-light ms-2 mb-0">series</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Table -->
+            <div class="table-responsive">
+                <table id="seriesTable" class="table table-striped table-dark nowrap" width="100%">
+                    <thead>
+                        <tr>
+                            <th>
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="checkbox form-check-input" id="selectAll" onchange="selectAllSeries(this)">
+                                </div>
+                            </th>
+                            <th>Seasons</th>
+                            <th>View</th>
+                            <th>Title</th>
+                            <th>Year</th>
+                            <th>Category</th>
+                            <th>Genre</th>
+                            <th>Portal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Series will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Playlist Controls -->
+            <div class="app-card primary mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Playlist Management</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="playlistName" class="form-label text-light">Playlist Name</label>
+                                <input type="text" class="form-control" id="playlistName" placeholder="My Series Playlist">
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="includeMetadataSwitch" checked>
+                                    <label class="form-check-label text-light" for="includeMetadataSwitch">Include Metadata</label>
+                                </div>
+                                <div class="form-check form-switch mt-2">
+                                    <input class="form-check-input" type="checkbox" id="includeEpisodesSwitch" checked>
+                                    <label class="form-check-label text-light" for="includeEpisodesSwitch">Include All Episodes</label>
+                                </div>
+                                <div class="form-check form-switch mt-2">
+                                    <input class="form-check-input" type="checkbox" id="xuiCompatibleSwitch">
+                                    <label class="form-check-label text-light" for="xuiCompatibleSwitch">XUI One Panel Compatible Format</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-grid gap-2 mb-3">
+                                <button class="btn btn-primary" id="createPlaylistBtn">
+                                    <i class="bi-file-earmark-music"></i> Create M3U Playlist
+                                </button>
+                                <button class="btn btn-outline-primary" id="createRawPlaylistBtn">
+                                    <i class="bi-code"></i> Create Raw Playlist
+                                </button>
+                            </div>
+                            <div id="selectedCount" class="mt-2 text-center text-light">
+                                0 series selected
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Seasons View -->
+            <div id="seasonsView" class="card d-none">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <button id="backToSeries" class="btn btn-sm btn-outline-secondary me-2">
+                            <i class="bi-arrow-left"></i> Back
+                        </button>
+                        <h5 class="d-inline mb-0" id="seriesTitle">Series Title</h5>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="seasonsList" class="list-group mb-4">
+                        <!-- Seasons will be loaded here -->
+                    </div>
+                    <div id="loadingSeasons" class="text-center py-3 d-none">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading seasons...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Episodes View -->
+            <div id="episodesView" class="card d-none">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <button id="backToSeasons" class="btn btn-sm btn-outline-secondary me-2">
+                            <i class="bi-arrow-left"></i> Back
+                        </button>
+                        <h5 class="d-inline mb-0" id="seasonTitle">Season Title</h5>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="episodesList" class="list-group">
+                        <!-- Episodes will be loaded here -->
+                    </div>
+                    <div id="loadingEpisodes" class="text-center py-3 d-none">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading episodes...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Raw Playlist Modal -->
+<div class="modal fade" id="rawPlaylistModal" tabindex="-1" aria-labelledby="rawPlaylistModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header">
+                <h5 class="modal-title" id="rawPlaylistModalLabel">Raw Playlist</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="rawPlaylistContent" class="form-label">Playlist Content</label>
+                    <textarea class="form-control bg-dark text-light" id="rawPlaylistContent" rows="15" readonly></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="copyRawPlaylistBtn">
+                    <i class="bi-clipboard"></i> Copy to Clipboard
+                </button>
+                <button type="button" class="btn btn-success" id="downloadRawPlaylistBtn">
+                    <i class="bi-download"></i> Download
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Series Details Modal -->
+<div class="modal fade" id="seriesModal" tabindex="-1" aria-labelledby="seriesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="seriesModalLabel">Series Title</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <img id="seriesPoster" src="" alt="Series Poster" class="img-fluid rounded">
+                    </div>
+                    <div class="col-md-8">
+                        <div id="seriesDetails">
+                            <!-- Series details will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button id="viewSeasonsBtn" class="btn btn-primary">View Seasons</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Episode Details Modal -->
+<div class="modal fade" id="episodeModal" tabindex="-1" aria-labelledby="episodeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="episodeModalLabel">Episode Title</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <img id="episodePoster" src="" alt="Episode Screenshot" class="img-fluid rounded">
+                    </div>
+                    <div class="col-md-8">
+                        <div id="episodeDetails">
+                            <!-- Episode details will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a id="watchEpisodeBtn" href="#" class="btn btn-primary">Watch Episode</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const portalSelect = document.getElementById('portalSelect');
+        const titleSearch = document.getElementById('titleSearch');
+        const categorySelect = document.getElementById('categorySelect');
+        const seriesTable = document.getElementById('seriesTable').querySelector('tbody');
+        const seriesModal = new bootstrap.Modal(document.getElementById('seriesModal'));
+        const episodeModal = new bootstrap.Modal(document.getElementById('episodeModal'));
+        const rawPlaylistModal = new bootstrap.Modal(document.getElementById('rawPlaylistModal'));
+        const createPlaylistBtn = document.getElementById('createPlaylistBtn');
+        const createRawPlaylistBtn = document.getElementById('createRawPlaylistBtn');
+        const selectedCount = document.getElementById('selectedCount');
+
+        let currentPortal = '';
+        let allSeries = [];
+        let allCategories = [];
+        let selectedSeries = new Set();
+        let currentSeries = null;
+
+        // Handle portal selection
+        portalSelect.addEventListener('change', function() {
+            currentPortal = this.value;
+            if (currentPortal) {
+                loadCategories(currentPortal);
+            } else {
+                categorySelect.innerHTML = '<option value="">All Categories</option>';
+                seriesTable.innerHTML = '<tr><td colspan="8" class="text-center">Select a portal first</td></tr>';
+                updateSelectedCount();
+            }
+        });
+
+        // Handle filter application
+        function applyFilters() {
+            const title = titleSearch.value.toLowerCase();
+            const category = categorySelect.value;
+            
+            if (!currentPortal) {
+                seriesTable.innerHTML = '<tr><td colspan="8" class="text-center">Select a portal first</td></tr>';
+                return;
+            }
+            
+            if (allSeries.length === 0) {
+                loadAllSeries(currentPortal);
+                return;
+            }
+            
+            displayFilteredSeries(title, category);
+        }
+        
+        window.applyFilters = applyFilters;
+        
+        function resetFilters() {
+            titleSearch.value = '';
+            categorySelect.value = '';
+            
+            if (currentPortal && allSeries.length > 0) {
+                displayFilteredSeries('', '');
+            }
+        }
+        
+        window.resetFilters = resetFilters;
+
+        // Load categories for a portal
+        function loadCategories(portalId) {
+            categorySelect.innerHTML = '<option value="">Loading categories...</option>';
+            categorySelect.disabled = true;
+            
+            // Get portal name for cache files
+            const portalName = document.querySelector(`#portalSelect option[value="${portalId}"]`).textContent;
+            
+            // Fetch directly from API instead of trying cache
+            fetch(`/api/portal/${portalId}/series/categories`)
+                .then(response => response.json())
+                .then(categories => {
+                    allCategories = categories;
+                    categorySelect.innerHTML = '<option value="">All Categories</option>';
+                    
+                    categories.forEach(category => {
+                        const option = document.createElement('option');
+                        option.value = category.id;
+                        option.textContent = category.title;
+                        categorySelect.appendChild(option);
+                    });
+                    
+                    categorySelect.disabled = false;
+                    loadAllSeries(portalId);
+                })
+                .catch(error => {
+                    console.error('Error loading categories:', error);
+                    categorySelect.innerHTML = '<option value="">Error loading categories</option>';
+                    categorySelect.disabled = false;
+                    seriesTable.innerHTML = `<tr><td colspan="8" class="text-center">
+                        <div class="alert alert-danger">
+                            Error loading categories: ${error.message || 'Unknown error'}
+                        </div>
+                    </td></tr>`;
+                });
+        }
+
+        // Load all series from all categories
+        function loadAllSeries(portalId) {
+            allSeries = [];
+            selectedSeries.clear();
+            updateSelectedCount();
+            
+            seriesTable.innerHTML = `<tr><td colspan="8" class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading series...</span>
+                </div>
+                <p class="mt-2">Loading series from all categories...</p>
+            </td></tr>`;
+            
+            if (!allCategories || allCategories.length === 0) {
+                seriesTable.innerHTML = '<tr><td colspan="8" class="text-center">No categories found</td></tr>';
+                return;
+            }
+
+            // Skip trying the all_series cache, go directly to category-by-category loading
+            // Track loading progress
+            let categoriesLoaded = 0;
+            const totalCategories = allCategories.length;
+            
+            // Load series from each category with delay between requests
+            const loadCategoryWithDelay = (index) => {
+                if (index >= allCategories.length) {
+                    return; // All categories processed
+                }
+                
+                const category = allCategories[index];
+                
+                // Update loading status
+                seriesTable.innerHTML = `<tr><td colspan="8" class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading series...</span>
+                    </div>
+                    <p class="mt-2">Loading series from categories... (${categoriesLoaded}/${totalCategories})</p>
+                </td></tr>`;
+                
+                // Fetch directly from API instead of trying cache
+                fetch(`/api/portal/${portalId}/series/category/${category.id}/items`)
+                    .then(response => response.json())
+                    .then(data => {
+                        // Add category info to each series
+                        data.forEach(series => {
+                            series.categoryId = category.id;
+                            series.categoryTitle = category.title;
+                        });
+                        
+                        // Add to all series array
+                        allSeries = allSeries.concat(data);
+                        
+                        // Update progress
+                        categoriesLoaded++;
+                        
+                        if (categoriesLoaded === totalCategories) {
+                            // All categories loaded, display series
+                            displayFilteredSeries('', '');
+                        } else {
+                            // Load next category after a delay
+                            setTimeout(() => {
+                                loadCategoryWithDelay(index + 1);
+                            }, 500); // 500ms delay between category requests
+                        }
+                    })
+                    .catch(error => {
+                        console.error(`Error loading series for category ${category.title}:`, error);
+                        categoriesLoaded++;
+                        
+                        if (categoriesLoaded === totalCategories) {
+                            // All categories loaded, display series even with errors
+                            displayFilteredSeries('', '');
+                        } else {
+                            // Continue to next category after a delay
+                            setTimeout(() => {
+                                loadCategoryWithDelay(index + 1);
+                            }, 500); // 500ms delay between category requests
+                        }
+                    });
+            };
+            
+            // Start loading categories with delay
+            loadCategoryWithDelay(0);
+        }
+
+        // Display filtered series
+        function displayFilteredSeries(titleFilter, categoryFilter) {
+            if (allSeries.length === 0) {
+                seriesTable.innerHTML = '<tr><td colspan="8" class="text-center">No series found</td></tr>';
+                return;
+            }
+            
+            // Apply filters
+            const filteredSeries = allSeries.filter(series => {
+                const matchesTitle = !titleFilter || 
+                    (series.name && series.name.toLowerCase().includes(titleFilter)) || 
+                    (series.o_name && series.o_name.toLowerCase().includes(titleFilter));
+                
+                const matchesCategory = !categoryFilter || series.categoryId === categoryFilter;
+                
+                return matchesTitle && matchesCategory;
+            });
+            
+            if (filteredSeries.length === 0) {
+                seriesTable.innerHTML = '<tr><td colspan="8" class="text-center">No series match the filters</td></tr>';
+                return;
+            }
+            
+            // Clear table
+            seriesTable.innerHTML = '';
+            
+            // Add series to table
+            filteredSeries.forEach(series => {
+                const row = document.createElement('tr');
+                
+                // Checkbox column
+                const checkboxCell = document.createElement('td');
+                const checkboxDiv = document.createElement('div');
+                checkboxDiv.className = 'form-check form-switch';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'series-checkbox form-check-input';
+                checkbox.dataset.seriesId = series.id;
+                checkbox.checked = selectedSeries.has(series.id);
+                checkbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        selectedSeries.add(series.id);
+                    } else {
+                        selectedSeries.delete(series.id);
+                    }
+                    updateSelectedCount();
+                });
+                checkboxDiv.appendChild(checkbox);
+                checkboxCell.appendChild(checkboxDiv);
+                row.appendChild(checkboxCell);
+                
+                // Seasons button column
+                const seasonsCell = document.createElement('td');
+                const seasonsButton = document.createElement('button');
+                seasonsButton.className = 'btn btn-sm btn-outline-primary';
+                seasonsButton.innerHTML = '<i class="bi-collection"></i>';
+                seasonsButton.title = 'View seasons';
+                seasonsButton.addEventListener('click', function() {
+                    loadAndDisplaySeasons(series);
+                });
+                seasonsCell.appendChild(seasonsButton);
+                row.appendChild(seasonsCell);
+                
+                // View button column
+                const viewCell = document.createElement('td');
+                const viewButton = document.createElement('button');
+                viewButton.className = 'btn btn-sm btn-outline-info';
+                viewButton.innerHTML = '<i class="bi-info-circle"></i>';
+                viewButton.title = 'View series details';
+                viewButton.addEventListener('click', function() {
+                    showSeriesDetails(series);
+                });
+                viewCell.appendChild(viewButton);
+                row.appendChild(viewCell);
+                
+                // Title column
+                const titleCell = document.createElement('td');
+                titleCell.textContent = series.name || series.o_name || 'Unknown';
+                row.appendChild(titleCell);
+                
+                // Year column
+                const yearCell = document.createElement('td');
+                yearCell.textContent = series.year || 'N/A';
+                row.appendChild(yearCell);
+                
+                // Category column
+                const categoryCell = document.createElement('td');
+                categoryCell.textContent = series.categoryTitle || 'Unknown';
+                row.appendChild(categoryCell);
+                
+                // Genre column
+                const genreCell = document.createElement('td');
+                genreCell.textContent = series.genre || 'N/A';
+                row.appendChild(genreCell);
+                
+                // Portal column
+                const portalCell = document.createElement('td');
+                const portalName = document.querySelector(`#portalSelect option[value="${currentPortal}"]`).textContent;
+                portalCell.textContent = portalName;
+                row.appendChild(portalCell);
+                
+                seriesTable.appendChild(row);
+            });
+        }
+
+        // Load and display seasons for a series
+        function loadAndDisplaySeasons(series) {
+            currentSeries = series;
+            
+            // Show the series title
+            document.getElementById('seriesTitle').textContent = series.name || series.o_name || 'Series';
+            
+            // Show loading spinner
+            document.getElementById('seasonsList').innerHTML = '';
+            document.getElementById('loadingSeasons').classList.remove('d-none');
+            
+            // Show seasons view, hide table
+            document.querySelector('.table-responsive').classList.add('d-none');
+            document.getElementById('seasonsView').classList.remove('d-none');
+            document.getElementById('episodesView').classList.add('d-none');
+            
+            // Add a small delay before making the request
+            setTimeout(() => {
+                // Fetch directly from API instead of trying cache
+                fetch(`/api/portal/${currentPortal}/series/${series.id}/seasons`)
+                    .then(response => response.json())
+                    .then(seasons => {
+                        document.getElementById('loadingSeasons').classList.add('d-none');
+                        
+                        if (!seasons || seasons.length === 0) {
+                            document.getElementById('seasonsList').innerHTML = '<div class="alert alert-warning">No seasons found for this series</div>';
+                            return;
+                        }
+                        
+                        // Display seasons
+                        const seasonsList = document.getElementById('seasonsList');
+                        seasonsList.innerHTML = '';
+                        
+                        seasons.forEach(season => {
+                            const seasonItem = document.createElement('div');
+                            seasonItem.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+                            
+                            const seasonTitle = document.createElement('div');
+                            seasonTitle.textContent = season.name || `Season ${season.season_number || '?'}`;
+                            
+                            const buttonsDiv = document.createElement('div');
+                            
+                            // View episodes button
+                            const viewButton = document.createElement('button');
+                            viewButton.className = 'btn btn-sm btn-primary me-2';
+                            viewButton.innerHTML = '<i class="bi-list"></i> Episodes';
+                            viewButton.addEventListener('click', function() {
+                                loadAndDisplayEpisodes(series, season);
+                            });
+                            
+                            buttonsDiv.appendChild(viewButton);
+                            seasonItem.appendChild(seasonTitle);
+                            seasonItem.appendChild(buttonsDiv);
+                            seasonsList.appendChild(seasonItem);
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error loading seasons:', error);
+                        document.getElementById('loadingSeasons').classList.add('d-none');
+                        document.getElementById('seasonsList').innerHTML = `<div class="alert alert-danger">Error loading seasons: ${error.message}</div>`;
+                    });
+            }, 300); // 300ms delay before making the API request
+        }
+
+        // Load and display episodes for a season
+        function loadAndDisplayEpisodes(series, season) {
+            // Show the season title
+            document.getElementById('seasonTitle').textContent = `${series.name} - ${season.name || 'Season ' + (season.season_number || '?')}`;
+            
+            // Show loading spinner
+            document.getElementById('episodesList').innerHTML = '';
+            document.getElementById('loadingEpisodes').classList.remove('d-none');
+            
+            // Show episodes view
+            document.querySelector('.table-responsive').classList.add('d-none');
+            document.getElementById('seasonsView').classList.add('d-none');
+            document.getElementById('episodesView').classList.remove('d-none');
+            
+            // Add a small delay before making the request
+            setTimeout(() => {
+                // Fetch directly from API instead of trying cache
+                fetch(`/api/portal/${currentPortal}/series/${series.id}/season/${season.id}/episodes`)
+                    .then(response => response.json())
+                    .then(episodes => {
+                        document.getElementById('loadingEpisodes').classList.add('d-none');
+                        
+                        if (!episodes || episodes.length === 0) {
+                            document.getElementById('episodesList').innerHTML = '<div class="alert alert-warning">No episodes found for this season</div>';
+                            return;
+                        }
+                        
+                        // Display episodes
+                        const episodesList = document.getElementById('episodesList');
+                        episodesList.innerHTML = '';
+                        
+                        episodes.forEach(episode => {
+                            const episodeItem = document.createElement('div');
+                            episodeItem.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+                            
+                            const episodeTitle = document.createElement('div');
+                            episodeTitle.innerHTML = `<span class="badge bg-secondary me-2">${episode.episode_number || '?'}</span> ${episode.name || episode.title || 'Episode ' + (episode.episode_number || '?')}`;
+                            
+                            const buttonsDiv = document.createElement('div');
+                            
+                            // Info button
+                            const infoButton = document.createElement('button');
+                            infoButton.className = 'btn btn-sm btn-outline-info me-2';
+                            infoButton.innerHTML = '<i class="bi-info-circle"></i>';
+                            infoButton.title = 'Episode details';
+                            infoButton.addEventListener('click', function() {
+                                showEpisodeDetails(episode, series, season);
+                            });
+                            
+                            // Play button
+                            const playButton = document.createElement('button');
+                            playButton.className = 'btn btn-sm btn-primary';
+                            playButton.innerHTML = '<i class="bi-play-fill"></i>';
+                            playButton.title = 'Play episode';
+                            playButton.addEventListener('click', function() {
+                                window.open(`/play/series/${currentPortal}/${episode.id}?web=true`, '_blank');
+                            });
+                            
+                            buttonsDiv.appendChild(infoButton);
+                            buttonsDiv.appendChild(playButton);
+                            episodeItem.appendChild(episodeTitle);
+                            episodeItem.appendChild(buttonsDiv);
+                            episodesList.appendChild(episodeItem);
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error loading episodes:', error);
+                        document.getElementById('loadingEpisodes').classList.add('d-none');
+                        document.getElementById('episodesList').innerHTML = `<div class="alert alert-danger">Error loading episodes: ${error.message}</div>`;
+                    });
+            }, 300); // 300ms delay before making the API request
+        }
+
+        // Show series details
+        function showSeriesDetails(series) {
+            document.getElementById('seriesModalLabel').textContent = series.name || series.o_name || 'Series Details';
+            
+            // Set poster
+            const poster = document.getElementById('seriesPoster');
+            if (series.screenshot_uri || series.poster_path || series.cover_big) {
+                poster.src = series.screenshot_uri || series.poster_path || series.cover_big;
+                poster.style.display = 'block';
+            } else {
+                poster.style.display = 'none';
+            }
+            
+            // Set details
+            const detailsDiv = document.getElementById('seriesDetails');
+            let detailsHTML = '<dl class="row">';
+            
+            if (series.o_name && series.o_name !== series.name) {
+                detailsHTML += `<dt class="col-sm-4">Original Title</dt><dd class="col-sm-8">${series.o_name}</dd>`;
+            }
+            
+            if (series.year) {
+                detailsHTML += `<dt class="col-sm-4">Year</dt><dd class="col-sm-8">${series.year}</dd>`;
+            }
+            
+            if (series.genre) {
+                detailsHTML += `<dt class="col-sm-4">Genre</dt><dd class="col-sm-8">${series.genre}</dd>`;
+            }
+            
+            if (series.director) {
+                detailsHTML += `<dt class="col-sm-4">Director</dt><dd class="col-sm-8">${series.director}</dd>`;
+            }
+            
+            if (series.actors) {
+                detailsHTML += `<dt class="col-sm-4">Cast</dt><dd class="col-sm-8">${series.actors}</dd>`;
+            }
+            
+            if (series.description || series.plot) {
+                detailsHTML += `<dt class="col-sm-4">Description</dt><dd class="col-sm-8">${series.description || series.plot}</dd>`;
+            }
+            
+            if (series.rating) {
+                detailsHTML += `<dt class="col-sm-4">Rating</dt><dd class="col-sm-8">${series.rating}</dd>`;
+            }
+            
+            detailsHTML += '</dl>';
+            detailsDiv.innerHTML = detailsHTML;
+            
+            // Set view seasons button
+            const viewSeasonsBtn = document.getElementById('viewSeasonsBtn');
+            viewSeasonsBtn.onclick = function() {
+                seriesModal.hide();
+                loadAndDisplaySeasons(series);
+            };
+            
+            // Show modal
+            seriesModal.show();
+        }
+
+        // Show episode details
+        function showEpisodeDetails(episode, series, season) {
+            document.getElementById('episodeModalLabel').textContent = episode.name || episode.title || `Episode ${episode.episode_number || '?'}`;
+            
+            // Set poster
+            const poster = document.getElementById('episodePoster');
+            if (episode.screenshot_uri || episode.poster_path || episode.cover) {
+                poster.src = episode.screenshot_uri || episode.poster_path || episode.cover;
+                poster.style.display = 'block';
+            } else {
+                poster.style.display = 'none';
+            }
+            
+            // Set details
+            const detailsDiv = document.getElementById('episodeDetails');
+            let detailsHTML = '<dl class="row">';
+            
+            detailsHTML += `<dt class="col-sm-4">Series</dt><dd class="col-sm-8">${series.name || 'Unknown'}</dd>`;
+            detailsHTML += `<dt class="col-sm-4">Season</dt><dd class="col-sm-8">${season.name || 'Season ' + (season.season_number || '?')}</dd>`;
+            
+            if (episode.episode_number) {
+                detailsHTML += `<dt class="col-sm-4">Episode Number</dt><dd class="col-sm-8">${episode.episode_number}</dd>`;
+            }
+            
+            if (episode.description || episode.plot) {
+                detailsHTML += `<dt class="col-sm-4">Description</dt><dd class="col-sm-8">${episode.description || episode.plot}</dd>`;
+            }
+            
+            if (episode.duration || episode.time) {
+                detailsHTML += `<dt class="col-sm-4">Duration</dt><dd class="col-sm-8">${episode.duration || episode.time} min</dd>`;
+            }
+            
+            detailsHTML += '</dl>';
+            detailsDiv.innerHTML = detailsHTML;
+            
+            // Set watch button
+            const watchBtn = document.getElementById('watchEpisodeBtn');
+            watchBtn.href = `/play/series/${currentPortal}/${episode.id}?web=true`;
+            
+            // Show modal
+            episodeModal.show();
+        }
+
+        // Back button event listeners
+        document.getElementById('backToSeries').addEventListener('click', function() {
+            document.querySelector('.table-responsive').classList.remove('d-none');
+            document.getElementById('seasonsView').classList.add('d-none');
+            document.getElementById('episodesView').classList.add('d-none');
+        });
+        
+        document.getElementById('backToSeasons').addEventListener('click', function() {
+            document.querySelector('.table-responsive').classList.add('d-none');
+            document.getElementById('seasonsView').classList.remove('d-none');
+            document.getElementById('episodesView').classList.add('d-none');
+        });
+
+        // Select all series
+        function selectAllSeries(checkbox) {
+            const checked = checkbox.checked;
+            document.querySelectorAll('.series-checkbox').forEach(cb => {
+                cb.checked = checked;
+                const seriesId = cb.dataset.seriesId;
+                if (checked) {
+                    selectedSeries.add(seriesId);
+                } else {
+                    selectedSeries.delete(seriesId);
+                }
+            });
+            updateSelectedCount();
+        }
+        window.selectAllSeries = selectAllSeries;
+
+        // Update selected count
+        function updateSelectedCount() {
+            selectedCount.textContent = `${selectedSeries.size} series selected`;
+        }
+
+        // Create playlist
+        createPlaylistBtn.addEventListener('click', function() {
+            if (selectedSeries.size === 0) {
+                alert('Please select at least one series');
+                return;
+            }
+            
+            const playlistName = document.getElementById('playlistName').value || 'My Series Playlist';
+            const includeMetadata = document.getElementById('includeMetadataSwitch').checked;
+            const includeEpisodes = document.getElementById('includeEpisodesSwitch').checked;
+            const xuiCompatible = document.getElementById('xuiCompatibleSwitch').checked;
+            
+            // Show loading indicator
+            const originalButtonText = this.innerHTML;
+            this.innerHTML = '<i class="bi-hourglass-split"></i> Creating Playlist...';
+            this.disabled = true;
+            
+            const formData = {
+                portalId: currentPortal,
+                seriesIds: Array.from(selectedSeries),
+                playlistName: playlistName,
+                includeMetadata: includeMetadata,
+                includeEpisodes: includeEpisodes,
+                xuiCompatible: xuiCompatible
+            };
+            
+            // Add a simple console log to verify the data being sent
+            console.log('Sending request to /api/playlist/series with data:', formData);
+            
+            fetch('/api/playlist/series', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => {
+                console.log('Response status:', response.status, response.statusText);
+                
+                // Reset button state
+                this.innerHTML = originalButtonText;
+                this.disabled = false;
+                
+                if (!response.ok) {
+                    // Try to parse the error message from the response
+                    return response.text().then(text => {
+                        try {
+                            // Try to parse as JSON
+                            const errorData = JSON.parse(text);
+                            throw new Error(errorData.error || 'Network response was not ok');
+                        } catch (e) {
+                            // If not valid JSON, just use the text
+                            throw new Error('Server error: ' + (text || response.statusText));
+                        }
+                    });
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `${playlistName.replace(/\s+/g, '_')}.m3u`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(error => {
+                // Reset button state if not already done
+                this.innerHTML = originalButtonText;
+                this.disabled = false;
+                
+                console.error('Error creating playlist:', error);
+                alert('Error creating playlist: ' + error.message);
+            });
+        });
+
+        // Create raw playlist
+        createRawPlaylistBtn.addEventListener('click', function() {
+            if (selectedSeries.size === 0) {
+                alert('Please select at least one series');
+                return;
+            }
+            
+            const playlistName = document.getElementById('playlistName').value || 'My Series Playlist';
+            const includeMetadata = document.getElementById('includeMetadataSwitch').checked;
+            const includeEpisodes = document.getElementById('includeEpisodesSwitch').checked;
+            const xuiCompatible = document.getElementById('xuiCompatibleSwitch').checked;
+            
+            // Show loading indicator
+            const originalButtonText = this.innerHTML;
+            this.innerHTML = '<i class="bi-hourglass-split"></i> Creating Playlist...';
+            this.disabled = true;
+            
+            const formData = {
+                portalId: currentPortal,
+                seriesIds: Array.from(selectedSeries),
+                playlistName: playlistName,
+                includeMetadata: includeMetadata,
+                includeEpisodes: includeEpisodes,
+                xuiCompatible: xuiCompatible
+            };
+            
+            // Add a simple console log to verify the data being sent
+            console.log('Sending request to /api/playlist/series with data:', formData);
+            
+            fetch('/api/playlist/series', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => {
+                console.log('Response status:', response.status, response.statusText);
+                
+                // Reset button state
+                this.innerHTML = originalButtonText;
+                this.disabled = false;
+                
+                if (!response.ok) {
+                    // Try to parse the error message from the response
+                    return response.text().then(text => {
+                        try {
+                            // Try to parse as JSON
+                            const errorData = JSON.parse(text);
+                            throw new Error(errorData.error || 'Network response was not ok');
+                        } catch (e) {
+                            // If not valid JSON, just use the text
+                            throw new Error('Server error: ' + (text || response.statusText));
+                        }
+                    });
+                }
+                return response.text();
+            })
+            .then(text => {
+                document.getElementById('rawPlaylistContent').value = text;
+                rawPlaylistModal.show();
+            })
+            .catch(error => {
+                // Reset button state if not already done
+                this.innerHTML = originalButtonText;
+                this.disabled = false;
+                
+                console.error('Error creating raw playlist:', error);
+                alert('Error creating raw playlist: ' + error.message);
+            });
+        });
+
+        // Copy raw playlist to clipboard
+        document.getElementById('copyRawPlaylistBtn').addEventListener('click', function() {
+            const rawContent = document.getElementById('rawPlaylistContent');
+            rawContent.select();
+            document.execCommand('copy');
+            alert('Playlist copied to clipboard!');
+        });
+
+        // Download raw playlist
+        document.getElementById('downloadRawPlaylistBtn').addEventListener('click', function() {
+            const rawContent = document.getElementById('rawPlaylistContent').value;
+            const playlistName = document.getElementById('playlistName').value || 'My_Series_Playlist';
+            
+            const blob = new Blob([rawContent], {type: 'text/plain'});
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `${playlistName.replace(/\s+/g, '_')}.m3u`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+        });
+        
+        // Initialize portal if available in URL params
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('portal')) {
+            const portalParam = urlParams.get('portal');
+            if (portalSelect.querySelector(`option[value="${portalParam}"]`)) {
+                portalSelect.value = portalParam;
+                portalSelect.dispatchEvent(new Event('change'));
+            }
+        }
+    });
+</script>
+{% endblock %}

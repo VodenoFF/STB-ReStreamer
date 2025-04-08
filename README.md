@@ -27,6 +27,7 @@ A powerful IPTV streaming proxy server that manages and restreams channels from 
   - M3U playlist generation with customizable sorting
   - Channel group playlists
   - EPG ID mapping
+  - XUI One Panel compatible format
 
 ## Requirements
 
@@ -89,6 +90,14 @@ A powerful IPTV streaming proxy server that manages and restreams channels from 
 - Web preview: Add `?web=true` to the URL
 - M3U playlist: `http://localhost:8001/playlist`
 - Group playlist: `http://localhost:8001/groups_playlist`
+
+### M3U Playlist Options
+
+- **Include Metadata**: Adds additional metadata information to the playlist
+- **XUI One Panel Compatible Format**: Formats the playlist for compatibility with XUI One and similar Xtream Codes based panels
+  - Consolidates metadata into standard tvg-id, tvg-logo, and group-title attributes
+  - Enables direct import into XUI One without losing information
+  - Preserves logos, genres, and category information
 
 ### HDHR Emulation
 
