@@ -467,8 +467,50 @@ def get_ffmpeg_path():
 
     return 'ffmpeg'  # Default to just the command name
 
+def get_ffprobe_path():
+    """
+    Get the path to the ffprobe executable, checking common locations.
+    Returns the full path if found, or just 'ffprobe' if not found in common locations.
+    """
+    try:
+        if os.name == 'nt':  # Windows
+            result = subprocess.run(['where', 'ffprobe'], capture_output=True, text=True)
+            if result.returncode == 0:
+                return 'ffprobe'  # ffprobe is in PATH
+            
+            # Check common Windows install locations
+            common_paths = [
+                os.path.join(os.environ.get('ProgramFiles', ''), 'ffmpeg', 'bin', 'ffprobe.exe'),
+                os.path.join(os.environ.get('ProgramFiles(x86)', ''), 'ffmpeg', 'bin', 'ffprobe.exe'),
+                os.path.join(basePath, 'ffmpeg', 'bin', 'ffprobe.exe'),  # Local to the application
+                os.path.join(basePath, 'ffprobe.exe'),  # Direct in application directory
+                r'C:\ffmpeg\bin\ffprobe.exe',  # Common Windows installation path
+            ]
+        else:  # Linux/Unix
+            result = subprocess.run(['which', 'ffprobe'], capture_output=True, text=True)
+            if result.returncode == 0:
+                return 'ffprobe'  # ffprobe is in PATH
+            
+            # Check common Unix install locations
+            common_paths = [
+                '/usr/bin/ffprobe',
+                '/usr/local/bin/ffprobe',
+                os.path.join(basePath, 'ffprobe'),  # Local to the application
+            ]
+
+        # Check each path
+        for path in common_paths:
+            if os.path.isfile(path):
+                return path
+
+    except Exception as e:
+        logger.error(f"Error checking ffprobe path: {e}")
+
+    return 'ffprobe'  # Default to just the command name
+
 # Add to the global variables section
 ffmpeg_path = get_ffmpeg_path()  # Get ffmpeg path once at startup
+ffprobe_path = get_ffprobe_path()  # Get ffprobe path once at startup
 
 #endregion
 
