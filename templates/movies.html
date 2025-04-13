@@ -276,10 +276,53 @@
             // Get portal name for cache files
             const portalName = document.querySelector(`#portalSelect option[value="${portalId}"]`).textContent;
             
+            // Log the exact URL being called for debugging
+            const categoriesUrl = `/api/portal/${portalId}/vod/categories`;
+            console.log(`Attempting to fetch categories from: ${categoriesUrl}`);
+            
             // Fetch directly from API instead of using cache
-            fetch(`/api/portal/${portalId}/vod/categories`)
-                .then(response => response.json())
+            fetch(categoriesUrl)
+                .then(response => {
+                    // Log response details for debugging
+                    console.log(`API Response status: ${response.status} ${response.statusText}`);
+                    console.log(`Response URL: ${response.url}`);
+
+                    // First check if the response is OK before parsing
+                    if (!response.ok) {
+                        // For 404 errors, try the cached endpoint as fallback
+                        if (response.status === 404) {
+                            console.log("Primary endpoint not found, trying cached endpoint as fallback");
+                            // Try the cached endpoint instead
+                            return fetch(`/api/cached/vod_categories/${portalId}`)
+                                .then(fallbackResponse => {
+                                    console.log(`Fallback response status: ${fallbackResponse.status}`);
+                                    if (!fallbackResponse.ok) {
+                                        throw new Error(`Both primary and fallback endpoints failed. Primary: 404, Fallback: ${fallbackResponse.status}`);
+                                    }
+                                    return fallbackResponse.json();
+                                });
+                        }
+                        
+                        return response.json().then(errorData => {
+                            throw new Error(errorData.message || `HTTP error ${response.status}: ${response.statusText}`);
+                        }).catch(err => {
+                            // If JSON parsing fails, just throw the HTTP status with more detail
+                            throw new Error(`HTTP error ${response.status}: ${response.statusText}. The server might be returning an error page instead of JSON.`);
+                        });
+                    }
+                    
+                    // Now try to parse as JSON
+                    return response.json().catch(err => {
+                        // This catches JSON parsing errors
+                        if (err.message.includes("Unexpected token '<'")) {
+                            throw new Error("Received HTML instead of JSON. The portal might be offline, authentication has expired, or the API endpoint is returning an error page.");
+                        } else {
+                            throw err;
+                        }
+                    });
+                })
                 .then(categories => {
+                    console.log(`Loaded ${categories.length} categories successfully`);
                     allCategories = categories;
                     categorySelect.innerHTML = '<option value="">All Categories</option>';
                     
@@ -297,9 +340,23 @@
                     console.error('Error loading categories:', error);
                     categorySelect.innerHTML = '<option value="">Error loading categories</option>';
                     categorySelect.disabled = false;
+                    
+                    // Show a more detailed error message to the user
+                    const errorMsg = error.message || 'Unknown error';
+                    const refreshTip = errorMsg.includes('authentication') || errorMsg.includes('token') || errorMsg.includes('HTML') 
+                        ? '<p>Try refreshing the portal data in the Portals section.</p>' 
+                        : '';
+                    
+                    const endpoint404Tip = errorMsg.includes('404') 
+                        ? '<p>This usually indicates that the VOD categories API endpoint is missing or misconfigured.</p>' 
+                        : '';
+                        
                     moviesTable.innerHTML = `<tr><td colspan="8" class="text-center">
                         <div class="alert alert-danger">
-                            Error loading categories: ${error.message || 'Unknown error'}
+                            <h4>Error loading categories</h4>
+                            <p>${errorMsg}</p>
+                            ${refreshTip}
+                            ${endpoint404Tip}
                         </div>
                     </td></tr>`;
                 });
@@ -346,7 +403,27 @@
                 
                 // Fetch directly from API instead of trying cache first
                 fetch(`/api/portal/${portalId}/vod/category/${category.id}/items`)
-                    .then(response => response.json())
+                    .then(response => {
+                        // First check if the response is OK before parsing
+                        if (!response.ok) {
+                            return response.json().then(errorData => {
+                                throw new Error(errorData.message || `HTTP error ${response.status}`);
+                            }).catch(err => {
+                                // If JSON parsing fails, just throw the HTTP status
+                                throw new Error(`HTTP error ${response.status}`);
+                            });
+                        }
+                        
+                        // Now try to parse as JSON
+                        return response.json().catch(err => {
+                            // This catches JSON parsing errors
+                            if (err.message.includes("Unexpected token '<'")) {
+                                throw new Error("Received HTML instead of JSON. The portal might be offline or authentication has expired.");
+                            } else {
+                                throw err;
+                            }
+                        });
+                    })
                     .then(data => {
                         // Add category info to each movie
                         data.forEach(movie => {
@@ -374,9 +451,26 @@
                         console.error(`Error loading movies for category ${category.title}:`, error);
                         categoriesLoaded++;
                         
+                        // Continue loading other categories even if one fails
                         if (categoriesLoaded === totalCategories) {
-                            // All categories loaded, display movies even with errors
-                            displayFilteredMovies('', '');
+                            if (allMovies.length > 0) {
+                                // If we have some movies, show them
+                                displayFilteredMovies('', '');
+                            } else {
+                                // Otherwise, show error
+                                const errorMsg = error.message || 'Unknown error';
+                                const refreshTip = errorMsg.includes('authentication') || errorMsg.includes('token') || errorMsg.includes('HTML') 
+                                    ? '<p>Try refreshing the portal data in the Portals section.</p>' 
+                                    : '';
+                                
+                                moviesTable.innerHTML = `<tr><td colspan="8" class="text-center">
+                                    <div class="alert alert-danger">
+                                        <h4>Error loading movies</h4>
+                                        <p>${errorMsg}</p>
+                                        ${refreshTip}
+                                    </div>
+                                </td></tr>`;
+                            }
                         } else {
                             // Continue to next category after a delay
                             setTimeout(() => {
