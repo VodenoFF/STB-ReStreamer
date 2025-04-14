@@ -20,14 +20,11 @@ from flask import (
 )
 import stb
 import waitress
-import xml.etree.cElementTree as ET
 from werkzeug.utils import secure_filename
 from collections import OrderedDict
 from threading import Lock
-import hashlib
 import threading
-import urllib.parse
-from flask_cors import CORS
+
 
 def fix_screenshot_urls(items, portal_url):
     """
@@ -92,7 +89,7 @@ def fix_screenshot_urls(items, portal_url):
 
     return items
 
-#region Caching and Rate Limiting Classes
+# region Caching and Rate Limiting Classes
 
 class LinkCache:
     """
@@ -110,7 +107,7 @@ class LinkCache:
         self.cache = OrderedDict()
         self.max_size = max_size
         self.default_ttl = default_ttl
-        self.lock = Lock() # Thread lock to ensure thread-safe access to the cache
+        self.lock = Lock()  # Thread lock to ensure thread-safe access to the cache
 
     def get(self, key):
         """
@@ -126,10 +123,10 @@ class LinkCache:
             if key in self.cache:
                 data = self.cache[key]
                 if time.time() - data['timestamp'] < self.default_ttl:
-                    self.cache.move_to_end(key) # Move to end to mark as recently used (LRU)
+                    self.cache.move_to_end(key)  # Move to end to mark as recently used (LRU)
                     return data['link'], data.get('ffmpegcmd')
                 else:
-                    del self.cache[key] # Remove expired entry
+                    del self.cache[key]  # Remove expired entry
             return None, None
 
     def set(self, key, link, ffmpegcmd=None):
@@ -139,10 +136,11 @@ class LinkCache:
         Args:
             key (str): The cache key (e.g., portalId:channelId).
             link (str): The streaming link to cache.
-            ffmpegcmd (list, optional): The ffmpeg command associated with the link. Defaults to None.
+            ffmpegcmd (list, optional): The ffmpeg command associated with the link.
+                                       Defaults to None.
         """
         with self.lock:
-            while len(self.cache) >= self.max_size: # Evict oldest items if cache is full (LRU)
+            while len(self.cache) >= self.max_size:  # Evict oldest items if cache is full
                 self.cache.popitem(last=False)
 
             self.cache[key] = {
@@ -150,7 +148,7 @@ class LinkCache:
                 'ffmpegcmd': ffmpegcmd,
                 'timestamp': time.time()
             }
-            self.cache.move_to_end(key) # Move to end to mark as recently used (LRU)
+            self.cache.move_to_end(key)  # Move to end to mark as recently used (LRU)
 
     def cleanup(self):
         """
@@ -159,7 +157,7 @@ class LinkCache:
         with self.lock:
             now = time.time()
             expired = [k for k, v in self.cache.items()
-                      if now - v['timestamp'] > self.default_ttl]
+                       if now - v['timestamp'] > self.default_ttl]
             for k in expired:
                 del self.cache[k]
 
@@ -174,13 +172,14 @@ class RateLimiter:
 
         Args:
             default_limit (int): Default cooldown duration (in seconds).
-            cleanup_interval (int): Interval (in seconds) to cleanup expired cooldown entries.
+            cleanup_interval (int): Interval (in seconds) to cleanup expired entries.
         """
-        self.cooldowns = {}  # {key: {'timestamp': time, 'count': n}} - Stores cooldown info per key
+        # {key: {'timestamp': time, 'count': n}} - Stores cooldown info per key
+        self.cooldowns = {}  
         self.default_limit = default_limit
         self.cleanup_interval = cleanup_interval
         self.last_cleanup = time.time()
-        self.lock = Lock() # Thread lock for thread-safe access to cooldowns
+        self.lock = Lock()  # Thread lock for thread-safe access to cooldowns
 
     def check_rate(self, key, duration=None):
         """
@@ -188,48 +187,48 @@ class RateLimiter:
 
         Args:
             key (str): The key to check (e.g., portalId:channelId).
-            duration (int, optional): Cooldown duration to check against. Defaults to default_limit.
+            duration (int, optional): Cooldown duration to check against. 
+                                     Defaults to default_limit.
 
         Returns:
-            tuple: (can_access, remaining_time) - can_access is True if access is allowed, False otherwise.
-                                                 remaining_time is the time left in the cooldown if rate limited.
+            tuple: (can_access, remaining_time) - can_access is True if access is allowed,
+                  False otherwise. remaining_time is the time left in cooldown if limited.
         """
         if duration is None:
             duration = self.default_limit
 
         with self.lock:
-            self._cleanup_if_needed() # Clean up expired entries before checking
+            self._cleanup_if_needed()  # Clean up expired entries before checking
 
             now = time.time()
             if key in self.cooldowns:
                 last_access = self.cooldowns[key]['timestamp']
                 time_elapsed = now - last_access
                 if time_elapsed < duration:
-                    return False, duration - time_elapsed # Rate limited, return remaining time
-            return True, 0 # Not rate limited, access allowed
+                    # Rate limited, return remaining time
+                    return False, duration - time_elapsed
+            return True, 0  # Not rate limited, access allowed
 
     def update_rate(self, key):
         """
-        Updates the rate limit timestamp for a key, effectively starting or resetting the cooldown.
+        Updates the rate limit timestamp for a key, effectively starting/resetting cooldown.
 
         Args:
             key (str): The key to update (e.g., portalId:channelId).
         """
         with self.lock:
-            now = time.time()
-            self.cooldowns[key] = {
-                'timestamp': now,
-                'count': self.cooldowns.get(key, {}).get('count', 0) + 1
-            }
+            self._cleanup_if_needed()
+            self.cooldowns[key] = {'timestamp': time.time()}
 
     def _cleanup_if_needed(self):
         """
-        Cleans up expired cooldown entries if the cleanup interval has passed.
+        Cleans up expired cooldown entries if cleanup interval has elapsed.
+        Internal method, called automatically during rate checks and updates.
         """
         now = time.time()
         if now - self.last_cleanup > self.cleanup_interval:
             expired = [k for k, v in self.cooldowns.items()
-                      if now - v['timestamp'] > self.default_limit]
+                       if now - v['timestamp'] > self.default_limit]
             for k in expired:
                 del self.cooldowns[k]
             self.last_cleanup = now
@@ -336,14 +335,14 @@ movie_details_cache = {}
 
 #endregion
 
-#region Flask Application Setup
+# region Flask Application Setup
 
 app = Flask(__name__)
 app.secret_key = secrets.token_urlsafe(32) # Secret key for Flask sessions and CSRF protection
 
 #endregion
 
-#region Logging Configuration
+# region Logging Configuration
 
 logger = logging.getLogger("STB-Proxy")
 logger.setLevel(logging.INFO) # Set logging level to INFO
@@ -364,7 +363,7 @@ logger.addHandler(consoleHandler)
 
 #endregion
 
-#region Configuration and Data Paths
+# region Configuration and Data Paths
 
 basePath = os.path.abspath(os.getcwd()) # Get the absolute path of the current working directory
 parent_folder = os.path.join(basePath, "portals") # Path to the portals data folder
@@ -376,7 +375,7 @@ alerts_file = os.path.join(basePath, "alerts.json") # Path to the alerts file
 
 #endregion
 
-#region Global Variables
+# region Global Variables
 
 occupied = {} # Dictionary to track occupied MAC addresses and streaming clients. {portalId: [{mac, channel_id, channel_name, client, portal_name, start_time}, ...]}
 config = {} # Global config dictionary, loaded from config.json
@@ -516,7 +515,7 @@ ffprobe_path = get_ffprobe_path()  # Get ffprobe path once at startup
 
 #endregion
 
-#region Alert Management Functions
+# region Alert Management Functions
 
 def load_alerts():
     """
@@ -580,7 +579,7 @@ def add_alert(alert_type, source, message, status="active"):
 
 #endregion
 
-#region Configuration File Management Functions
+# region Configuration File Management Functions
 
 def save_json(file_path, data, message):
     """
@@ -747,7 +746,7 @@ def saveSettings(settings):
 
 #endregion
 
-#region Channel Group Management Functions
+# region Channel Group Management Functions
 
 def getChannelGroups():
     """
@@ -787,7 +786,7 @@ def getChannelGroups():
                                         all_channels = json.load(file)
                                         channel_lookup = {str(ch["id"]): ch["name"] for ch in all_channels}
                                         channel["channelName"] = channel_lookup.get(channel["channelId"], "Unknown Channel")
-                                except:
+                                except Exception:
                                     channel["channelName"] = "Unknown Channel"
 
             saveChannelGroups(groups) # Save with updated channel names
@@ -816,7 +815,7 @@ def saveChannelGroups(channel_groups):
 
 #endregion
 
-#region Authentication Decorator
+# region Authentication Decorator
 
 def authorise(f):
     """
@@ -842,7 +841,7 @@ def authorise(f):
 
 #endregion
 
-#region Utility Functions
+# region Utility Functions
 
 def moveMac(portalId, mac):
     """
@@ -864,7 +863,7 @@ def moveMac(portalId, mac):
 
 #endregion
 
-#region Route Handlers - Web UI
+# region Route Handlers - Web UI
 
 @app.route("/", methods=["GET"])
 @authorise
@@ -1196,7 +1195,7 @@ def editor_data():
                     with open(genre_path, 'r') as file:
                         genres = json.load(file)
                     break # Break after loading data for the first MAC
-                except:
+                except Exception:
                     allChannels = None
                     genres = None
 
@@ -1389,7 +1388,7 @@ def save():
 
 #endregion
 
-#region Route Handlers - Playlist Generation
+# region Route Handlers - Playlist Generation
 
 @app.route("/playlist", methods=["GET"])
 @authorise
@@ -1423,7 +1422,7 @@ def playlist():
                         with open(genre_path, 'r') as file:
                             genres = json.load(file)
                         break # Break after loading data for the first MAC
-                    except:
+                    except Exception:
                         allChannels = None
                         genres = None
 
@@ -1489,7 +1488,7 @@ def groups_playlist():
 
 #endregion
 
-#region Route Handlers - Stream Playback
+# region Route Handlers - Stream Playback
 
 @app.route("/player/<portalId>/<channelId>", methods=["GET"])
 def player_page(portalId, channelId):
@@ -2002,7 +2001,7 @@ def channel(portalId, channelId):
 
 #endregion
 
-#region Route Handlers - Dashboard and Logs
+# region Route Handlers - Dashboard and Logs
 
 @app.route("/dashboard")
 @authorise
@@ -2035,7 +2034,7 @@ def log():
 
 #endregion
 
-#region HDHR Emulation Routes
+# region HDHR Emulation Routes
 
 def hdhr(f):
     """
@@ -2126,7 +2125,7 @@ def lineup():
                         with open(genre_path, 'r') as file:
                             genres = json.load(file)
                         break # Break after loading data for the first MAC
-                    except:
+                    except Exception:
                         allChannels = None
 
                 if allChannels: # If channel data loaded successfully
@@ -2159,7 +2158,7 @@ def lineup():
 
 #endregion
 
-#region Channel Group Routes - Web UI and API
+# region Channel Group Routes - Web UI and API
 
 @app.route("/channels", methods=["GET", "POST"])
 @authorise
@@ -2427,7 +2426,7 @@ def reorder_groups():
 
 #endregion
 
-#region Channel Group Playback Route
+# region Channel Group Playback Route
 
 @app.route("/chplay/<groupID>", methods=["GET"])
 def chplay(groupID):
@@ -2472,7 +2471,7 @@ def chplay(groupID):
 
 #endregion
 
-#region Alert Routes - Web UI and API
+# region Alert Routes - Web UI and API
 
 @app.route("/groups", methods=["GET"])
 @authorise
@@ -2594,7 +2593,7 @@ def resolve_alert():
 
 #endregion
 
-#region Background Tasks (Currently Empty)
+# region Background Tasks (Currently Empty)
 
 # Add error handling for non-working channels (currently a placeholder function)
 def check_channel_status(url, mac, token, proxy):
@@ -2602,9 +2601,14 @@ def check_channel_status(url, mac, token, proxy):
     Placeholder function for checking channel status (currently does not perform actual checks).
     """
     try:
-        response = stb.make_request(url, proxy) # Placeholder request
-        if not response or response.status_code != 200: # Placeholder check
-            add_alert("error", "Channel Check", f"Channel not responding: {url}") # Placeholder alert
+        # Import requests module for making HTTP requests
+        import requests
+        
+        # Make a request to the channel URL
+        response = requests.get(url, proxies={"http": proxy, "https": proxy} if proxy else None, timeout=10)
+        
+        if not response or response.status_code != 200:
+            add_alert("error", "Channel Check", f"Channel not responding: {url}")
             return False
         return True
     except Exception as e:
@@ -3268,7 +3272,7 @@ def getSeasonEpisodes(portalId, seriesId, seasonId):
         return jsonify({"error": f"Error fetching episodes: {str(e)}"}), 500
 
 
-#region Deprecated Cache API Routes (Redirects to Unified API)
+# region Deprecated Cache API Routes (Redirects to Unified API)
 
 @app.route("/api/cached/vod_categories/<portalId>", methods=["GET"])
 def getCachedVodCategories(portalId):
@@ -3450,7 +3454,7 @@ def getCachedAllSeries(portalId):
 
 #endregion
 
-#region Content Management Functions
+# region Content Management Functions
 
 def ensure_content_directories():
     """
@@ -3613,7 +3617,7 @@ def save_content_json(file_path, content):
 
 #endregion
 
-#region Prefetch Content
+# region Prefetch Content
 
 @app.route("/api/portal/<portalId>/prefetch", methods=["POST"])
 @authorise
@@ -3931,7 +3935,7 @@ def portalChannels(portalId):
 
 #endregion
 
-#region Playlist Generation Functions
+# region Playlist Generation Functions
 
 @app.route("/api/playlist/movies", methods=["POST"])
 @authorise
@@ -3970,7 +3974,7 @@ def create_movies_playlist():
 
         # Get portal details
         portals = getPortals()
-        if portal_id not in portals:
+        if portalId not in portals:
             return jsonify({"error": "Portal not found"}), 404
 
         portal = portals[portal_id]
@@ -4173,7 +4177,7 @@ def create_series_playlist():
 
         # Get portal details
         portals = getPortals()
-        if portal_id not in portals:
+        if portalId not in portals:
             return jsonify({"error": "Portal not found"}), 404
 
         portal = portals[portal_id]
@@ -4491,7 +4495,7 @@ def create_series_playlist():
 
 #endregion
 
-#region Content Playback Routes
+# region Content Playback Routes
 
 @app.route("/play/vod/<portalId>/<movieId>", methods=["GET"])
 def play_vod(portalId, movieId):
@@ -4902,308 +4906,6 @@ def get_cached_content(content_type, portal_id, resource_path):
     """
     try:
         portals = getPortals()
-        if portal_id not in portals:
-            return jsonify({"error": "Portal not found"}), 404
-
-        portal = portals[portal_id]
-        url = portal["url"]
-        portal_name = portal.get("name")
-
-        # Handle different resource types
-        if resource_path == "categories":
-            # Get categories
-            if content_type == "vod":
-                # Load VOD categories from file
-                vod_categories_path = os.path.join(parent_folder, f"{portal_name}_vod_categories.json")
-
-                if os.path.exists(vod_categories_path):
-                    with open(vod_categories_path, 'r') as file:
-                        vod_categories = json.load(file)
-
-                    # Filter to only include VOD categories (not Series)
-                    vod_categories = [category for category in vod_categories if category.get("type") == "VOD"]
-                    return jsonify(vod_categories)
-                else:
-                    return jsonify({"error": "VOD categories not found"}), 404
-            elif content_type == "series":
-                # Load Series categories from file
-                series_categories_path = os.path.join(parent_folder, f"{portal_name}_series_categories.json")
-
-                if os.path.exists(series_categories_path):
-                    with open(series_categories_path, 'r') as file:
-                        series_categories = json.load(file)
-
-                    # Filter to only include Series categories
-                    series_categories = [category for category in series_categories if category.get("type") == "Series"]
-                    return jsonify(series_categories)
-                else:
-                    # Try to load from VOD categories file and filter
-                    vod_categories_path = os.path.join(parent_folder, f"{portal_name}_vod_categories.json")
-                    if os.path.exists(vod_categories_path):
-                        with open(vod_categories_path, 'r') as file:
-                            vod_categories = json.load(file)
-
-                        # Filter to only include Series categories
-                        series_categories = [category for category in vod_categories if category.get("type") == "Series"]
-                        return jsonify(series_categories)
-                    else:
-                        return jsonify({"error": "Series categories not found"}), 404
-            else:
-                return jsonify({"error": f"Invalid content type: {content_type}"}), 400
-        elif resource_path.startswith("category/"):
-            # Get items for a category
-            category_id = resource_path.split("/")[1]
-
-            if content_type == "vod":
-                # Get VOD items for the category
-                vod_items_path = get_vod_items_path(portal_id, category_id)
-
-                if os.path.exists(vod_items_path):
-                    # Load from cache
-                    items = load_json_content(vod_items_path)
-                    if items:
-                        # Fix any relative screenshot URLs
-                        items = fix_screenshot_urls(items, url)
-                        return jsonify(items)
-
-                # Try to fetch from API if not in cache or empty
-                try:
-                    macs = list(portal["macs"].keys())
-                    if not macs:
-                        return jsonify({"error": "No MACs available"}), 400
-
-                    mac = macs[0]
-                    proxy = portal["proxy"]
-
-                    # Get token
-                    token = stb.getToken(url, mac, proxy)
-                    if not token:
-                        return jsonify({"error": "Failed to authenticate with portal"}), 500
-
-                    # Get items
-                    items = tryWithTokenRefresh(stb.getOrderedList, url, mac, token, proxy, "vod", category_id)
-
-                    # Check if valid response
-                    if isinstance(items, str) or not items:
-                        return jsonify([])
-
-                    # Fix any relative screenshot URLs
-                    items = fix_screenshot_urls(items, url)
-
-                    # Save to cache
-                    save_content_json(vod_items_path, items)
-
-                    return jsonify(items)
-                except Exception as e:
-                    logger.error(f"Error fetching VOD items for category {category_id}: {e}")
-                    return jsonify({"error": f"Error fetching VOD items: {str(e)}"}), 500
-            elif content_type == "series":
-                # Get Series items for the category
-                series_items_path = get_series_items_path(portal_id, category_id)
-
-                if os.path.exists(series_items_path):
-                    # Load from cache
-                    items = load_json_content(series_items_path)
-                    if items:
-                        # Fix any relative screenshot URLs
-                        items = fix_screenshot_urls(items, url)
-                        return jsonify(items)
-
-                # Handle special "No Series Found" category
-                if category_id == "0":
-                    return jsonify([{
-                        "id": "0",
-                        "title": "No Series Found",
-                        "type": "Series"
-                    }])
-
-                # Try to fetch from API if not in cache or empty
-                try:
-                    macs = list(portal["macs"].keys())
-                    if not macs:
-                        return jsonify({"error": "No MACs available"}), 400
-
-                    mac = macs[0]
-                    proxy = portal["proxy"]
-
-                    # Get token
-                    token = stb.getToken(url, mac, proxy)
-                    if not token:
-                        return jsonify({"error": "Failed to authenticate with portal"}), 500
-
-                    # First try with series type
-                    try:
-                        items = tryWithTokenRefresh(stb.getOrderedList, url, mac, token, proxy, "series", category_id)
-
-                        # Ensure items is a list and not a string
-                        if isinstance(items, str):
-                            raise Exception("API returned string, trying VOD type instead")
-
-                        if not isinstance(items, list):
-                            if items is None:
-                                items = []
-                            else:
-                                # Convert to list if possible
-                                try:
-                                    items = list(items)
-                                except:
-                                    items = [items] if items else []
-                    except Exception as e2:
-                        # If we get an error with series type, try VOD type
-                        logger.warning(f"Error fetching Series items, trying VOD type: {e2}")
-                        items = tryWithTokenRefresh(stb.getOrderedList, url, mac, token, proxy, "vod", category_id)
-
-                        # Ensure items is a list
-                        if not isinstance(items, list):
-                            if items is None:
-                                items = []
-                            elif isinstance(items, str):
-                                logger.error(f"API returned a string instead of a list/dict: {items}")
-                                items = []
-                            else:
-                                # Convert to list if possible
-                                try:
-                                    items = list(items)
-                                except:
-                                    items = [items] if items else []
-
-                    # Fix any relative screenshot URLs
-                    items = fix_screenshot_urls(items, url)
-
-                    # Save to cache
-                    save_content_json(series_items_path, items)
-
-                    return jsonify(items)
-                except Exception as e:
-                    logger.error(f"Error fetching Series items for category {category_id}: {e}")
-                    return jsonify({"error": f"Error fetching Series items: {str(e)}"}), 500
-            else:
-                return jsonify({"error": f"Invalid content type: {content_type}"}), 400
-        elif resource_path.startswith("seasons/"):
-            # Get seasons for a series
-            series_id = resource_path.split("/")[1]
-
-            if content_type != "series":
-                return jsonify({"error": f"Invalid content type for seasons: {content_type}"}), 400
-
-            # Get seasons from cache or API
-            seasons_path = get_seasons_path(portal_id, series_id)
-
-            if os.path.exists(seasons_path):
-                # Load from cache
-                seasons = load_json_content(seasons_path)
-                if seasons:
-                    # Fix any relative screenshot URLs
-                    seasons = fix_screenshot_urls(seasons, url)
-                    return jsonify(seasons)
-
-            # Try to fetch from API if not in cache or empty
-            try:
-                macs = list(portal["macs"].keys())
-                if not macs:
-                    return jsonify({"error": "No MACs available"}), 400
-
-                mac = macs[0]
-                proxy = portal["proxy"]
-
-                # Get token
-                token = stb.getToken(url, mac, proxy)
-                if not token:
-                    return jsonify({"error": "Failed to authenticate with portal"}), 500
-
-                # Get seasons
-                seasons = tryWithTokenRefresh(stb.getSeriesSeasons, url, mac, token, proxy, series_id)
-
-                # Check if valid response
-                if isinstance(seasons, str) or not seasons:
-                    return jsonify([])
-
-                # Fix any relative screenshot URLs
-                seasons = fix_screenshot_urls(seasons, url)
-
-                # Save to cache
-                save_content_json(seasons_path, seasons)
-
-                return jsonify(seasons)
-            except Exception as e:
-                logger.error(f"Error fetching seasons for series {series_id}: {e}")
-                return jsonify({"error": f"Error fetching seasons: {str(e)}"}), 500
-        elif resource_path.startswith("episodes/"):
-            # Get episodes for a season
-            parts = resource_path.split("/")
-            if len(parts) < 3:
-                return jsonify({"error": "Invalid resource path"}), 400
-
-            series_id = parts[1]
-            season_id = parts[2]
-
-            if content_type != "series":
-                return jsonify({"error": f"Invalid content type for episodes: {content_type}"}), 400
-
-            # Get episodes from cache or API
-            episodes_path = get_episodes_path(portal_id, series_id, season_id)
-
-            if os.path.exists(episodes_path):
-                # Load from cache
-                episodes = load_json_content(episodes_path)
-                if episodes:
-                    # Fix any relative screenshot URLs
-                    episodes = fix_screenshot_urls(episodes, url)
-                    return jsonify(episodes)
-
-            # Try to fetch from API if not in cache or empty
-            try:
-                macs = list(portal["macs"].keys())
-                if not macs:
-                    return jsonify({"error": "No MACs available"}), 400
-
-                mac = macs[0]
-                proxy = portal["proxy"]
-
-                # Get token
-                token = stb.getToken(url, mac, proxy)
-                if not token:
-                    return jsonify({"error": "Failed to authenticate with portal"}), 500
-
-                # Get episodes
-                episodes = tryWithTokenRefresh(stb.getSeasonEpisodes, url, mac, token, proxy, series_id, season_id)
-
-                # Check if valid response
-                if isinstance(episodes, str) or not episodes:
-                    return jsonify([])
-
-                # Fix any relative screenshot URLs
-                episodes = fix_screenshot_urls(episodes, url)
-
-                # Save to cache
-                save_content_json(episodes_path, episodes)
-
-                return jsonify(episodes)
-            except Exception as e:
-                logger.error(f"Error fetching episodes for series {series_id}, season {season_id}: {e}")
-                return jsonify({"error": f"Error fetching episodes: {str(e)}"}), 500
-        else:
-            return jsonify({"error": f"Invalid resource path: {resource_path}"}), 400
-    except Exception as e:
-        logger.error(f"Error fetching cached content: {e}")
-        return jsonify({"error": f"Error fetching content: {str(e)}"}), 500
-
-
-@app.route("/api/portal/<portalId>/vod/categories", methods=["GET"])
-@authorise
-def getPortalVodCategories(portalId):
-    """
-    Returns VOD categories for a portal. First tries to load from cached JSON file,
-    then falls back to fetching from the portal API.
-
-    Args:
-        portalId (str): ID of the portal.
-
-    Returns:
-        JSON: List of VOD categories.
-    """
-    try:
-        portals = getPortals()
         if portalId not in portals:
             return jsonify({"error": "Portal not found"}), 404
 
@@ -5287,7 +4989,7 @@ def getPortalVodCategories(portalId):
             "message": str(e)
         }), 500
 
-#region Main Application Entrypoint
+# region Main Application Entrypoint
 
 if __name__ == "__main__":
     # Load configuration at startup
